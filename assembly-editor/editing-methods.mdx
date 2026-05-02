@@ -1,0 +1,116 @@
+---
+title: "Edit methods and classes in C# or Visual Basic in dnSpy"
+description: "Rewrite methods, add new classes, and modify existing types with IntelliSense support — then compile and save your changes directly to the assembly."
+---
+
+dnSpy lets you edit any method or class in a loaded assembly using real C# or Visual Basic source code. The editor is backed by Roslyn, so you get full IntelliSense — completions, parameter hints, and inline error squiggles — just like in Visual Studio. When you click **Compile**, dnSpy recompiles the code and patches the result into the assembly in memory.
+
+## Editing an existing method
+
+<Steps>
+  <Step title="Find the method in Assembly Explorer">
+    In the **Assembly Explorer** panel, expand the assembly, then navigate through its namespaces and types to find the method you want to change. You can also double-click any method in the code view to jump to its Assembly Explorer node.
+  </Step>
+  <Step title="Open the code editor">
+    Right-click the method node and select **Edit Method (C#)** or **Edit Method (Visual Basic)**. The inline code editor opens, showing a decompiled version of the method ready for editing.
+
+    You can also right-click directly in the decompiled code view and choose **Edit Method** from the context menu, or press **Ctrl+Shift+E** while the cursor is inside a method body.
+  </Step>
+  <Step title="Make your changes">
+    Edit the method body as needed. IntelliSense provides completions and type information from the assembly's existing references. Compiler errors appear inline as you type.
+  </Step>
+  <Step title="Compile and apply">
+    Click the **Compile** button or press **Ctrl+S** to compile. If compilation succeeds, the new IL is patched into the assembly in memory. If there are errors, the editor highlights them so you can fix them before recompiling.
+  </Step>
+</Steps>
+
+<Tip>
+  You can undo and redo edits through **Edit > Undo** (**Ctrl+Z**) and **Edit > Redo** (**Ctrl+Y**). All assembly editor operations participate in the same undo history.
+</Tip>
+
+## Editing an existing class
+
+To change a class — for example, to add an interface implementation or modify an attribute — right-click the type node in **Assembly Explorer** and select **Edit Class (C#)** or **Edit Class (Visual Basic)**. The editor opens showing the full class declaration, including all members. You can add, remove, or change any member within that class.
+
+You can also right-click anywhere in the decompiled class body and choose **Edit Class** from the context menu.
+
+## Adding a new class
+
+<Steps>
+  <Step title="Select a module or namespace node">
+    In **Assembly Explorer**, right-click the module or namespace where you want to add the class.
+  </Step>
+  <Step title="Choose Add Class">
+    Select **Add Class (C#)** or **Add Class (Visual Basic)** from the context menu. The editor opens with a minimal class template.
+  </Step>
+  <Step title="Write and compile the class">
+    Write your class definition, then click **Compile**. The new type is added to the assembly in memory and appears immediately in the Assembly Explorer treeview.
+  </Step>
+</Steps>
+
+## Adding members to an existing type
+
+To add new methods, fields, properties, or events to a type you did not create, right-click the type node and select **Add Members (C#)** or **Add Members (Visual Basic)**. The editor opens with the existing type context available, and the new members you define are merged into the existing type after compilation.
+
+## Language examples
+
+<Tabs>
+  <Tab title="C#">
+    ```csharp
+    // Example: replace a method body
+    public string GetGreeting(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+            return "Hello, world!";
+        return $"Hello, {name}!";
+    }
+    ```
+  </Tab>
+  <Tab title="Visual Basic">
+    ```vb
+    ' Example: replace a method body
+    Public Function GetGreeting(name As String) As String
+        If String.IsNullOrEmpty(name) Then
+            Return "Hello, world!"
+        End If
+        Return $"Hello, {name}!"
+    End Function
+    ```
+  </Tab>
+</Tabs>
+
+## Saving the edited assembly
+
+Editing operations are applied in memory. To write the changes back to disk:
+
+<Steps>
+  <Step title="Open the save dialog">
+    Go to **File > Save Module** (or **Save All**). The save dialog lets you choose an output path and configure save options such as PE header settings.
+  </Step>
+  <Step title="Choose an output path">
+    By default, dnSpy suggests the original file location. Point it to a new path if you want to preserve the original, then click **OK** to write the file.
+  </Step>
+</Steps>
+
+<Warning>
+  Saving overwrites the output file. If you want to keep the original assembly unmodified, always save to a different path.
+</Warning>
+
+## Low-level metadata table editing
+
+For changes that are not expressible in C# or Visual Basic — such as altering raw flags, tokens, or signatures — you can edit metadata tables directly. Right-click any node in the **Assembly Explorer** and choose **Edit** at the bottom of the context menu to open the metadata dialog for that element. Fields map directly to the underlying metadata table columns.
+
+<Note>
+  Low-level metadata editing uses the hex editor internally. Click any address in the metadata dialog to jump to the corresponding bytes in the **Hex Editor** and inspect the raw binary representation.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Assembly editor overview" icon="book-open" href="/assembly-editor/overview">
+    Learn what the assembly editor can do and how the Assembly Explorer works.
+  </Card>
+  <Card title="IL editor" icon="microchip" href="/assembly-editor/il-editor">
+    Edit raw CIL opcodes for precise low-level control over method bodies.
+  </Card>
+</CardGroup>

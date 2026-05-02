@@ -1,0 +1,135 @@
+---
+title: "Edit raw IL method bodies with the dnSpy IL editor"
+description: "View and modify CIL opcodes, local variables, and exception handlers in any .NET method body for low-level control over assembly behavior."
+---
+
+The IL editor gives you direct, instruction-level access to a method's CIL (Common Intermediate Language) body. Instead of working with decompiled C# or Visual Basic, you manipulate the actual opcodes, operands, locals, and exception handlers that the .NET runtime executes. This is the right tool when you need precise control that a high-level language edit cannot provide — for example, patching a single branch target, inserting a `nop`, or inspecting what the decompiler generated.
+
+## Opening the IL editor
+
+<Steps>
+  <Step title="Find the method">
+    In the **Assembly Explorer** panel, navigate to the method whose body you want to edit. You can also locate it by browsing decompiled code in the main code view.
+  </Step>
+  <Step title="Open Edit IL Instructions">
+    Right-click the method node in **Assembly Explorer** and select **Edit Method Body**. In the dialog that opens, the **IL Body** tab displays the full CIL instruction list.
+
+    Alternatively, right-click anywhere inside a decompiled method body in the code view and choose **Edit IL Instructions** to open the same dialog with the instructions corresponding to the selected statement pre-selected.
+  </Step>
+  <Step title="Edit instructions, locals, or exception handlers">
+    Use the tabbed panels in the dialog to modify the instruction list, add or remove local variables, and configure exception handler regions. Click **OK** to apply your changes.
+  </Step>
+</Steps>
+
+<Tip>
+  Double-clicking an instruction opens an inline editor for its opcode and operand. You can also use the toolbar buttons to add rows, delete rows, move rows up or down, and replace selected instructions with `nop`.
+</Tip>
+
+## IL instruction syntax
+
+Each row in the instruction list represents one CIL instruction. A row has three parts:
+
+| Column | Description |
+|--------|-------------|
+| **Offset** | The byte offset of the instruction within the method body (read-only, recalculated automatically) |
+| **Opcode** | The CIL opcode name, such as `ldarg.0`, `call`, or `ret` |
+| **Operand** | The opcode's operand, which varies by opcode (a type token, method reference, branch target label, integer constant, etc.) |
+
+Operands that reference other elements in the assembly — such as method calls or field accesses — use a drop-down picker so you can select the target from the loaded metadata.
+
+## Common CIL opcodes
+
+The table below lists frequently used opcodes. See the [ECMA-335 standard](https://ecma-international.org/publications-and-standards/standards/ecma-335/) for the complete reference.
+
+| Opcode | Description |
+|--------|-------------|
+| `ldarg.0` / `ldarg` | Push a method argument onto the stack |
+| `ldloc.0` / `ldloc` | Push a local variable onto the stack |
+| `stloc.0` / `stloc` | Pop a value from the stack into a local variable |
+| `ldc.i4` / `ldc.i8` | Push an integer constant onto the stack |
+| `ldstr` | Push a string literal onto the stack |
+| `ldnull` | Push a null reference onto the stack |
+| `call` | Call a static or instance method (non-virtual) |
+| `callvirt` | Call a virtual method or interface method |
+| `newobj` | Create a new object and call its constructor |
+| `ldfld` / `stfld` | Load or store an instance field |
+| `ldsfld` / `stsfld` | Load or store a static field |
+| `pop` | Discard the top stack value |
+| `dup` | Duplicate the top stack value |
+| `nop` | No operation (useful as a placeholder) |
+| `ret` | Return from the method |
+
+## Branching and labels
+
+Branch instructions take another instruction as their operand. The IL editor represents branch targets as instruction references selected from a drop-down list of all instructions in the method. When you add or remove instructions, the editor automatically updates all branch targets.
+
+```nasm
+; Example: a simple conditional branch
+  ldc.i4.0
+  ldloc.0
+  bgt.s  IL_0010    ; branch if local 0 > 0
+  ldstr  "negative or zero"
+  ret
+IL_0010:
+  ldstr  "positive"
+  ret
+```
+
+The `switch` instruction takes a list of branch targets (one per case). The IL editor shows a sub-dialog for editing the target list when you select a `switch` instruction.
+
+## Exception handlers
+
+Each exception handler defines a protected region (try block) and one or more handler regions. The **Exception Handlers** tab in the IL body dialog lets you add, remove, and configure handlers. Each handler has the following properties:
+
+| Property | Description |
+|----------|-------------|
+| **Handler type** | `Catch`, `Filter`, `Finally`, or `Fault` |
+| **Try start / end** | First and last instruction of the protected region |
+| **Handler start / end** | First and last instruction of the handler region |
+| **Catch type** | The exception type to catch (for `Catch` handlers only) |
+| **Filter start** | Start of the filter expression (for `Filter` handlers only) |
+
+<Warning>
+  The .NET runtime enforces strict rules about exception handler region overlap and nesting. If your handler configuration is invalid, the runtime will throw a `BadImageFormatException` when loading the assembly.
+</Warning>
+
+## When to use IL editing vs. C# editing
+
+<Tabs>
+  <Tab title="Use C# or VB editing when...">
+    - You want to rewrite the logic of a method from scratch
+    - You need IntelliSense and compile-time error checking
+    - You are adding new types or members
+    - The change is large enough that maintaining it as source is easier
+
+    See [Edit methods and classes](/assembly-editor/editing-methods) for details.
+  </Tab>
+  <Tab title="Use IL editing when...">
+    - You need to patch a single instruction or branch target without changing surrounding code
+    - The decompiler cannot round-trip the method (e.g., obfuscated or compiler-generated code)
+    - You want to insert `nop` instructions to disable specific operations
+    - You need to inspect the exact opcodes the decompiler is working from
+    - You are working with unsafe or platform-specific constructs that C# cannot express directly
+  </Tab>
+</Tabs>
+
+## Hex editor integration
+
+Every instruction offset shown in the IL editor corresponds to a real location in the assembly file. Click any instruction row and then press **F12** (or right-click and choose **Show in Hex Editor**) to jump to the raw bytes of that instruction in the **Hex Editor**.
+
+Conversely, from the hex editor, pressing **F12** while viewing an IL method body navigates back to the corresponding decompiled statement or IL instruction in the code view. This round-trip makes it straightforward to verify that your IL patch produced the correct bytes in the binary.
+
+<Note>
+  The hex editor highlights .NET metadata structures and PE sections, and tooltips show field names and values for the bytes under the cursor. This is particularly useful when cross-checking offsets after an IL edit.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Assembly editor overview" icon="book-open" href="/assembly-editor/overview">
+    Understand what the assembly editor can do and how it fits into dnSpy.
+  </Card>
+  <Card title="Edit methods and classes" icon="code" href="/assembly-editor/editing-methods">
+    Rewrite methods and classes at the C# or Visual Basic level with IntelliSense.
+  </Card>
+</CardGroup>

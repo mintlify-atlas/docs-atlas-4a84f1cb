@@ -1,133 +1,57 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
-icon: 'star'
+title: "dnSpy: .NET Debugger and Assembly Editor"
+description: "dnSpy lets you debug, decompile, and edit .NET and Unity assemblies without source code. Debug .NET Framework, .NET Core, and Unity games with full breakpoint support."
 ---
 
-## Setting up
+dnSpy is a feature-rich debugger and assembly editor for .NET. Whether you need to debug a .NET application without source code, modify compiled assemblies, or inspect raw binary data in the hex editor, dnSpy provides everything you need in a single tool.
 
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Download and install dnSpy on Windows. Get the latest release and set up the Unity debugging support.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Load your first assembly and start debugging in minutes with this step-by-step guide.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Debugger" icon="bug" href="/debugger/overview">
+    Debug .NET Framework, .NET Core, and Unity assemblies with breakpoints, stepping, and expression evaluation.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Assembly Editor" icon="pen-to-square" href="/assembly-editor/overview">
+    Edit methods, classes, and metadata in C# or Visual Basic without needing original source code.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Core capabilities
 
-Everything you need to create world-class documentation.
+<CardGroup cols={2}>
+  <Card title="Hex Editor" icon="code" href="/hex-editor/overview">
+    Inspect raw binary data with .NET metadata and PE structure highlighting, and navigate between IL and decompiled code.
+  </Card>
+  <Card title="Search" icon="magnifying-glass" href="/features/search">
+    Search across all loaded assemblies for types, methods, fields, strings, and more.
+  </Card>
+  <Card title="Analyzer" icon="chart-bar" href="/features/analyzer">
+    Analyze type and member usage, find all callers, and explore reference graphs.
+  </Card>
+  <Card title="Scripting" icon="terminal" href="/features/scripting">
+    Automate dnSpy with the C# Interactive window and the scripting API.
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Build extensions
 
-## Make your content agent ready
+dnSpy exposes a public MEF-based API that lets you build extensions to add custom UI, new document types, debugger integrations, and more.
 
-Make your docs work for humans and AI agents alike.
-
-<Columns cols={2}>
-  <Card
-    title="Prompt component"
-    icon="robot"
-    href="/agent-ready/prompt"
-  >
-    Embed shareable AI prompts readers can copy or open in Cursor.
+<CardGroup cols={2}>
+  <Card title="Extension overview" icon="puzzle-piece" href="/extensions/overview">
+    Learn how the dnSpy extension system works and what you can build.
   </Card>
-  <Card
-    title="Visibility"
-    icon="eye"
-    href="/agent-ready/visibility"
-  >
-    Show different content to humans and agents reading your docs.
+  <Card title="Get started building" icon="wrench" href="/extensions/getting-started">
+    Set up your extension project and write your first extension in C#.
   </Card>
-  <Card
-    title="Contextual menu"
-    icon="bolt"
-    href="/agent-ready/contextual"
-  >
-    Give readers one-click access to Claude, ChatGPT, Cursor, and more.
+  <Card title="Extension interface" icon="file-code" href="/extensions/extension-interface">
+    Understand the IExtension interface and the MEF composition model.
   </Card>
-  <Card
-    title="AI coding tools"
-    icon="wand-magic-sparkles"
-    href="/ai-tools/claude-code"
-  >
-    Set up Claude Code, Cursor, or Windsurf with Mintlify's skill.
+  <Card title="API reference" icon="book" href="/extensions/api/documents">
+    Explore the full extension API for documents, debugger, and UI components.
   </Card>
-</Columns>
-
-## Need inspiration?
-
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+</CardGroup>

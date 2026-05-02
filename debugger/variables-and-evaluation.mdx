@@ -1,0 +1,131 @@
+---
+title: "Locals, watch windows, and live expression evaluation"
+description: "Inspect local variables, add watch expressions, evaluate C# and Visual Basic, pin Object IDs, and save or view variable data in the hex editor."
+---
+
+When the debugger pauses, the variables windows give you a live view of the program's state. You can browse locals, add your own watch expressions, let dnSpy automatically show relevant variables, and evaluate any C# or Visual Basic expression directly — all without source code.
+
+## Locals window
+
+The **Locals** window shows every local variable and parameter in the current stack frame, together with their types and current values.
+
+To open it, go to **Debug** > **Windows** > **Locals**.
+
+Relevant settings in `DebuggerSettings`:
+
+- **`SortParameters`** — sorts parameters alphabetically
+- **`SortLocals`** — sorts local variables alphabetically
+- **`GroupParametersAndLocalsTogether`** — shows parameters and locals in a single flat list
+- **`ShowReturnValues`** — shows the return value of the most recently called method
+- **`ShowRawLocals`** — shows raw locals from the metadata, including display class variables for captured variables instead of the synthesized names
+- **`HighlightChangedVariables`** — highlights variables whose values changed since the last pause
+
+<Tip>
+  Enable **`AutoOpenLocalsWindow`** in debugger settings to have the Locals window open automatically every time a debug session starts.
+</Tip>
+
+## Watch window
+
+The **Watch** window lets you add your own named expressions that are evaluated every time the debugger pauses. Open it from **Debug** > **Windows** > **Watch** > **Watch 1** (up to four Watch windows are available).
+
+To add an expression, click the empty row at the bottom of the window and type any valid C# or Visual Basic expression:
+
+```csharp
+myList.Count
+Convert.ToHexString(encryptedBytes)
+(int)myObj.privateField
+```
+
+Expressions run through the `DbgExpressionEvaluator` for the active language, with access to the full `DbgEvaluationOptions` set including side-effect detection.
+
+<Note>
+  Watch expressions are re-evaluated on every pause. If an expression causes side effects (for example, calling a method that modifies state), those side effects occur each time.
+</Note>
+
+## Autos window
+
+The **Autos** window automatically selects variables that are relevant to the statement the debugger is currently paused on — typically the variables referenced in the current and surrounding lines. Open it from **Debug** > **Windows** > **Autos**.
+
+The `DbgLanguage.AutosProvider` drives which variables appear. The Autos window is useful for a quick overview without having to scroll through the full Locals list.
+
+## Evaluating C# and Visual Basic expressions
+
+All variable windows — **Locals**, **Watch**, and **Autos** — support evaluating C# or Visual Basic expressions, not just displaying plain variable names. You can:
+
+- Call methods: `myString.ToUpper()`
+- Cast and convert: `(byte[])someObject`
+- Use LINQ: `items.Where(x => x.IsActive).Count()`
+- Assign values: type a new value in the **Value** column and press **Enter**
+
+The active language is determined by the decompilation language selected for the current module.
+
+<Warning>
+  Function evaluations (func-eval) execute code inside the debugged process. This can have side effects and may time out if the evaluated code deadlocks. The default func-eval timeout is 1 second (`DbgLanguage.DefaultFuncEvalTimeout`).
+</Warning>
+
+## Object IDs
+
+An **Object ID** pins a specific heap object so you can track it across multiple pauses and even after it has gone out of scope. dnSpy assigns a numeric ID to the object and shows it in all variable windows.
+
+To create an Object ID:
+
+<Steps>
+  <Step title="Find the object in a variables window">
+    Locate the variable in the **Locals**, **Watch**, or **Autos** window.
+  </Step>
+  <Step title="Create the ID">
+    Right-click the variable row and select **Make Object ID**. A label such as `{1}` appears next to the value.
+  </Step>
+  <Step title="Reference it in expressions">
+    You can reference the object by its ID in watch expressions using the `$` prefix, for example `$1`.
+  </Step>
+</Steps>
+
+## Saving variables to disk
+
+Variable windows can save the raw bytes of a variable — for example, a decrypted `byte[]` — directly to a file on disk:
+
+<Steps>
+  <Step title="Select the variable">
+    In any variables window, right-click a variable that holds binary data such as a `byte[]`.
+  </Step>
+  <Step title="Save to file">
+    Choose **Save** from the context menu and pick a destination file. dnSpy writes the raw bytes without any encoding.
+  </Step>
+</Steps>
+
+This is useful for extracting decrypted payloads, images, serialized objects, or any other binary data that the process has built in memory.
+
+## Viewing variables in the hex editor
+
+Instead of saving to disk, you can view a variable's memory directly in the **Hex Editor** (memory window):
+
+<Steps>
+  <Step title="Select the variable">
+    Right-click a variable in any variables window.
+  </Step>
+  <Step title="Open in hex editor">
+    Choose **Show in Memory Window**. The hex editor opens and scrolls to the address of the value (`DbgValue.GetRawAddressValue`).
+  </Step>
+</Steps>
+
+<Note>
+  The address shown in the memory window is only valid while the process is paused. Resuming the process may move the object, making the address stale.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Breakpoints" icon="circle-dot" href="/debugger/breakpoints">
+    Control when the debugger pauses with conditions, hit counts, and tracepoints.
+  </Card>
+  <Card title="Multiple processes" icon="layer-group" href="/debugger/multi-process">
+    Debug multiple processes at once and switch context between them.
+  </Card>
+  <Card title="Hex editor" icon="code" href="/hex-editor/overview">
+    Navigate and inspect raw binary data, PE structures, and .NET metadata.
+  </Card>
+  <Card title="Debugger API" icon="brackets-curly" href="/extensions/api/debugger-api">
+    Access evaluation and variable data programmatically from an extension.
+  </Card>
+</CardGroup>

@@ -1,0 +1,93 @@
+---
+title: "Debug multiple processes at the same time in dnSpy"
+description: "Attach to and control several processes in a single dnSpy session. Switch context between processes, manage threads, modules, and the call stack for each."
+---
+
+dnSpy can debug more than one process at the same time. You might launch a server and a client together, or attach to several services that interact with each other. Each process gets its own entry in the **Processes** window, and you can switch the active context freely between them without stopping any process.
+
+## Starting a multi-process session
+
+You can reach a multi-process state in two ways:
+
+<Tabs>
+  <Tab title="Launch multiple processes">
+    Use **Debug** > **Start Debugging** for each process you want to debug. Each new launch adds an entry to the active session without tearing down the previous one.
+  </Tab>
+  <Tab title="Attach to running processes">
+    Use **Debug** > **Attach to Process** repeatedly. Every successful attach adds the process to the current session alongside any processes already being debugged.
+  </Tab>
+</Tabs>
+
+## Processes window
+
+The **Processes** window lists every process currently being debugged. Open it from **Debug** > **Windows** > **Processes**.
+
+Each row shows the process ID, name, and the strings from `DbgProcess.Debugging` that describe what is being debugged (for example, `.NET Framework 4.8` or `Unity`). Click a row to make that process the active context. All other windows — **Locals**, **Call Stack**, **Threads**, and **Modules** — update to reflect the selected process.
+
+## Threads window
+
+The **Threads** window lists all threads for the currently active process. Open it from **Debug** > **Windows** > **Threads**.
+
+Each row shows the thread ID (`DbgThread.Id`), managed ID (`DbgThread.ManagedId`), name (`DbgThread.UIName`), kind, and suspended count. Double-clicking a thread row switches the call stack context to that thread.
+
+You can also freeze or thaw individual threads by right-clicking a row, which maps to `DbgThread.Freeze()` and `DbgThread.Thaw()`.
+
+## Modules window
+
+The **Modules** window shows all modules (assemblies) loaded in the active process. Open it from **Debug** > **Windows** > **Modules**.
+
+From this window you can:
+
+- See the load address, size, and path for each module
+- Right-click a module to open it in the assembly editor
+- Toggle **Break on module load** for future dynamic loads
+
+## Call stack window
+
+The **Call Stack** window shows the stack frames for the active thread. Open it from **Debug** > **Windows** > **Call Stack**.
+
+Double-clicking a frame jumps to the corresponding location in the decompiled code view. The source language (C# or Visual Basic) follows the decompilation setting for the frame's module.
+
+## BreakAll and RunAll
+
+When more than one process is being debugged, two global commands control all of them at once:
+
+- **BreakAll** (`DbgManager.BreakAll()`) — pauses every running process immediately
+- **RunAll** (`DbgManager.RunAll()`) — resumes every paused process
+
+You can invoke these from the **Debug** menu or map them to keyboard shortcuts.
+
+The `DbgManager.IsRunning` property reflects the combined state:
+
+| Value | Meaning |
+|---|---|
+| `true` | All processes are running |
+| `false` | All processes are paused |
+| `null` | Some processes are running and some are paused |
+
+## BreakAllProcesses setting
+
+The `DebuggerSettings.BreakAllProcesses` setting changes how resuming a single process works. When it is `true`, calling `DbgManager.Run(process)` for one process also resumes all other paused processes — equivalent to `RunAll`. When it is `false`, only the specified process resumes and the others remain paused.
+
+Enable this in **Debug** > **Options** > **Break all processes when one process breaks**.
+
+<Note>
+  With `BreakAllProcesses` enabled, hitting a breakpoint in one process automatically pauses all other processes. This keeps all processes in sync and prevents race conditions during multi-process debugging.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Debugger overview" icon="bug" href="/debugger/overview">
+    Learn the basics of starting sessions, stepping, and the Output window.
+  </Card>
+  <Card title="Breakpoints" icon="circle-dot" href="/debugger/breakpoints">
+    Set conditional breakpoints and tracepoints to control exactly when execution pauses.
+  </Card>
+  <Card title="Variables and evaluation" icon="brackets-curly" href="/debugger/variables-and-evaluation">
+    Inspect locals and evaluate expressions in the currently active process and thread.
+  </Card>
+  <Card title="Debugger API" icon="code" href="/extensions/api/debugger-api">
+    Use the public API to drive multi-process sessions from an extension or script.
+  </Card>
+</CardGroup>

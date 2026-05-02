@@ -1,0 +1,56 @@
+---
+title: "dnSpy: Debug and Edit .NET Assemblies Without Source"
+description: "dnSpy is a free, open-source debugger and assembly editor for .NET Framework, .NET Core, and Unity — no original source code required."
+---
+
+dnSpy is a free, open-source tool that lets you debug and edit .NET assemblies without having the original source code. Whether you are reverse-engineering a third-party library, patching a compiled application, or debugging a Unity game, dnSpy gives you the full power of a debugger and code editor working directly against compiled binaries.
+
+## Key features
+
+**Debugger** — Set breakpoints, step through code, and inspect variables in .NET Framework, .NET Core, and Unity game assemblies. dnSpy supports conditional breakpoints, tracepoints, multiple simultaneous processes, and first-chance exception handling. You can evaluate C# and Visual Basic expressions in the Locals, Watch, and Autos windows.
+
+**Assembly editor** — Edit any method, class, or metadata field directly in C# or Visual Basic with full IntelliSense. Add new members, rewrite IL bodies with the built-in IL editor, and save changes back to the binary — all without a build system or source tree.
+
+**Hex editor** — Inspect raw binary data with .NET metadata and PE structure highlighting. Jump from a decompiled method to its IL bytes and back, navigate by RVA or metadata token, and follow cross-references with Ctrl+F12.
+
+**Scripting** — Automate dnSpy using the C# Interactive window. The public API exposes the debugger, document system, and UI so you can write scripts or full extensions.
+
+## Supported runtimes
+
+- .NET Framework (targeting `net48` and earlier)
+- .NET (formerly .NET Core, `net5.0-windows` and later)
+- Unity (Mono-based Unity games, via the dnSpy-Unity-mono runtime patch)
+
+## Navigation
+
+<CardGroup cols={2}>
+  <Card title="Debugger" icon="bug" href="/debugger/overview">
+    Debug .NET and Unity assemblies with breakpoints, stepping, and expression evaluation.
+  </Card>
+  <Card title="Assembly editor" icon="pen-to-square" href="/assembly-editor/overview">
+    Edit methods, classes, and metadata in C# or Visual Basic without source code.
+  </Card>
+  <Card title="Hex editor" icon="code" href="/hex-editor/overview">
+    Inspect raw binary data with metadata and PE structure highlighting.
+  </Card>
+  <Card title="Scripting" icon="terminal" href="/features/scripting">
+    Automate dnSpy with the C# Interactive window and the public extension API.
+  </Card>
+</CardGroup>
+
+## Open-source libraries
+
+dnSpy builds on several other open-source projects:
+
+| Library | Purpose |
+|---------|---------|
+| [ILSpy](https://github.com/icsharpcode/ILSpy) | C# and Visual Basic decompiler engine |
+| [Roslyn](https://github.com/dotnet/roslyn) | C# and Visual Basic compilers used by the assembly editor |
+| [dnlib](https://github.com/0xd4d/dnlib) | .NET metadata reader/writer, handles obfuscated assemblies |
+| [VS MEF](https://github.com/microsoft/vs-mef) | Fast MEF implementation for the extension system |
+| [ClrMD](https://github.com/microsoft/clrmd) | Low-level debugging information beyond the CorDebug API |
+| [Iced](https://github.com/0xd4d/iced) | x86/x64 disassembler |
+
+<Note>
+dnSpy is licensed under [GPLv3](https://github.com/dnSpy/dnSpy/blob/master/dnSpy/dnSpy/LicenseInfo/GPLv3.txt). Any modifications you distribute must also be made available under GPLv3.
+</Note>

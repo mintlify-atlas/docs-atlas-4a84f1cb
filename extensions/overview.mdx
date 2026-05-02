@@ -1,0 +1,59 @@
+---
+title: "dnSpy extension system: what you can build and how"
+description: "Extend dnSpy with custom menus, tool windows, tree nodes, colorizers, documents, output panes, and tooltips using MEF-based auto-discovery."
+---
+
+dnSpy's extension system is built on the Managed Extensibility Framework (MEF), which means you add functionality by exporting types — no registration files or plugin manifests required. When dnSpy starts, it scans all DLL files in its installation directory, discovers your exports, and composes them into the running application automatically.
+
+## What extensions can do
+
+Extensions have access to the same internal APIs that dnSpy itself uses. The two example extensions in the source repository together demonstrate the full range of integration points:
+
+**Example1.Extension** covers the most common UI extension points:
+
+- Read and write per-extension settings persisted to dnSpy's settings file
+- Add a page to the **Options** dialog
+- Add items to the text editor's context menu and bind keyboard shortcuts
+- Add items to the Assembly Explorer treeview context menu
+- Create a new top-level menu (e.g. **_Extension**) and populate it with commands
+- Add buttons and combo boxes to the toolbar
+
+**Example2.Extension** demonstrates more advanced integration:
+
+- Add a dockable **tool window** (like **Locals** or **Call Stack**)
+- Add custom nodes to the Assembly Explorer tree
+- Provide custom tab content for those tree nodes
+- Show tooltips when hovering over custom references in the text editor
+- Register a new `IDsDocument` type so dnSpy can open additional file formats
+- Colorize text in the code editor and hex editor
+- Colorize Assembly Explorer tree nodes
+- Add a new pane to the **Output** window
+
+## How extension loading works
+
+When dnSpy launches, it enumerates every `*.dll` file in the same directory as the executable. Each assembly is inspected for MEF exports. If your assembly exports an `IExtension` implementation with `[ExportExtension]`, it is recognized as an extension and initialized in order.
+
+<Note>
+Your extension DLL must sit directly in the dnSpy installation directory, not in a subdirectory. Copy it there after building, then launch dnSpy to test.
+</Note>
+
+dnSpy uses [VS MEF](https://github.com/microsoft/vs-mef) instead of the standard `System.ComponentModel.Composition` MEF runtime. VS MEF caches the composition graph between launches, which significantly reduces startup time as the number of extensions grows. Your code still uses the standard `[Export]`, `[Import]`, and `[ImportingConstructor]` attributes from `System.ComponentModel.Composition` — VS MEF is a drop-in replacement for composition, not for the attribute API.
+
+## Extension system overview
+
+Every extension follows the same three-part structure:
+
+1. **One `IExtension` class** — exported with `[ExportExtension]`. Provides metadata and receives lifecycle events.
+2. **`IAutoLoaded` classes** — exported with `[ExportAutoLoaded]`. Instantiated automatically at startup; use these to register keyboard shortcuts, wire up services, or run initialization code.
+3. **Feature exports** — any other MEF exports such as `[ExportMenuItem]`, `[Export(typeof(IToolWindowContentProvider))]`, or `[Export(typeof(ISettingsSection))]`. dnSpy discovers and consumes these as part of the composition.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Getting started" icon="rocket" href="/extensions/getting-started">
+    Create a new class library project, reference the contracts package, and deploy your first extension.
+  </Card>
+  <Card title="IExtension interface" icon="code" href="/extensions/extension-interface">
+    Learn about the IExtension interface, ExtensionInfo, lifecycle events, and IAutoLoaded.
+  </Card>
+</CardGroup>

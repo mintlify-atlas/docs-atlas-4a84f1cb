@@ -1,0 +1,85 @@
+---
+title: "Navigate the hex editor by offset, token, and RVAs"
+description: "Jump to a file offset, RVA, .NET metadata token, heap offset, or method body in the hex editor, and switch between hex and decompiled code views."
+---
+
+The hex editor provides a set of **Go to** commands that let you jump precisely to any location in a binary — whether you know the file offset, a relative virtual address, a .NET metadata token, or a heap index. You can reach all of these commands from the **Edit** menu or through keyboard shortcuts.
+
+## Go to position
+
+Press **Ctrl+G** (or choose **Edit > Go to Position**) to open the Go to Position dialog. Enter any of the following:
+
+- A decimal number to jump to that file offset.
+- A hexadecimal number prefixed with `0x` or `&H` to jump to that file offset in hex.
+
+The caret moves to the byte at the requested position and centers the view on it.
+
+## Navigation targets
+
+<CardGroup cols={2}>
+  <Card title="Go to file offset" icon="file">
+    Jump to a specific raw offset within the file as it exists on disk. Use this when you know the exact byte position from another tool.
+  </Card>
+  <Card title="Go to RVA" icon="map-pin">
+    Jump to a Relative Virtual Address. dnSpy converts the RVA to a file offset using the PE section table and moves the caret there.
+  </Card>
+  <Card title="Go to .NET metadata token" icon="tag">
+    Enter a 32-bit metadata token (for example, `0x06000001` for the first method) to jump directly to the table row that defines that member.
+  </Card>
+  <Card title="Go to method body" icon="code">
+    Jump to the raw IL bytes of a method body given its metadata token. The hex editor moves to the first instruction of the method's CIL stream.
+  </Card>
+  <Card title="Go to #Blob / #Strings / #US offset" icon="database">
+    Enter a byte offset into the `#Blob`, `#Strings`, or `#US` heap to jump to that heap entry.
+  </Card>
+  <Card title="Go to #GUID heap index" icon="fingerprint">
+    Enter a one-based index into the `#GUID` heap. dnSpy converts the index to a byte offset and positions the caret on the 16-byte GUID entry.
+  </Card>
+</CardGroup>
+
+## Follow references with Ctrl+F12
+
+When the caret is on a field that contains a reference — such as a metadata token stored inside a table row or a coded index — press **Ctrl+F12** to follow it. The hex editor jumps to the target of the reference.
+
+<Steps>
+  <Step title="Position the caret">
+    Click on a highlighted .NET metadata field in the values column. The tooltip shows the field name and its interpreted value.
+  </Step>
+  <Step title="Press Ctrl+F12">
+    Press **Ctrl+F12**. dnSpy resolves the reference encoded in that field and moves the caret to the referenced location.
+  </Step>
+  <Step title="Navigate back">
+    Use the standard back navigation (**Alt+Left Arrow**) to return to where you were before following the reference.
+  </Step>
+</Steps>
+
+## Navigating between the hex editor and decompiled code
+
+The hex editor and the decompiler view are connected. You can move between them without losing your place.
+
+### From decompiled code to the hex editor
+
+Click on any address, opcode, or operand in the decompiler view. dnSpy scrolls the hex editor to the corresponding bytes and highlights the field that contains that value.
+
+### From the hex editor to decompiled code
+
+Place the cursor inside an IL method body in the hex editor and press **F12**. dnSpy opens the decompiled view for the method containing those bytes and positions the view at the matching statement.
+
+<Tip>
+This reverse navigation is useful for reverse engineering patches. If you see a byte has been modified in the hex editor, press **F12** to find the C# or Visual Basic statement that the patched instruction corresponds to.
+</Tip>
+
+## Offset format options
+
+You can change how the **Offset** column displays positions. Open the hex editor settings and choose one of the following formats:
+
+| Format | Example | When to use |
+|--------|---------|-------------|
+| Hex | `00001A3C` | General use; matches most external tools. |
+| C# hex (`0x` prefix) | `0x00001A3C` | When copying offsets into C# code. |
+| Visual Basic hex (`&H` prefix) | `&H00001A3C` | When copying offsets into VB code. |
+| Assembly hex (`h` suffix) | `00001A3Ch` | When working with assembler output. |
+
+<Note>
+Offset values can also be displayed in lowercase hex. Toggle **Lowercase hex offsets** in the hex editor settings.
+</Note>

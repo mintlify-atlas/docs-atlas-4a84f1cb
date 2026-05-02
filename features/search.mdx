@@ -1,0 +1,92 @@
+---
+title: "Search .NET assemblies for types, members, and strings"
+description: "Search all loaded assemblies for classes, methods, fields, properties, events, strings, numbers, and more using keywords or regular expressions."
+---
+
+The Search window lets you scan every loaded assembly at once for any named .NET member, string literal, or numeric constant. You can narrow results by member type using the filter dropdown and jump straight to a definition with a double-click.
+
+## Opening the search window
+
+Press **Ctrl+Shift+F**, or click **Edit > Search Assemblies**, to open the Search window.
+
+<Note>
+  The Search window searches all assemblies that are currently loaded in the document tree. Load additional assemblies first if you need to include them in the search scope.
+</Note>
+
+## Searchable member types
+
+The search engine uses `VisibleMembersFlags` to determine which member categories are included. You can target any of the following types using the filter dropdown:
+
+<CardGroup cols={2}>
+  <Card title="Type members" icon="cube">
+    Classes, structs, interfaces, enums, delegates — covering both generic and non-generic definitions.
+  </Card>
+  <Card title="Method members" icon="code">
+    Methods, constructors, and method bodies including local variables and parameters.
+  </Card>
+  <Card title="Field and property members" icon="list">
+    Fields, properties, and events defined on any type.
+  </Card>
+  <Card title="Assembly-level nodes" icon="layer-group">
+    Assemblies, modules, namespaces, assembly references, and resources.
+  </Card>
+</CardGroup>
+
+The full set of flags mirrors the `VisibleMembersFlags` enum defined in `dnSpy.Contracts.Search`:
+
+```csharp
+[Flags]
+public enum VisibleMembersFlags {
+    AssemblyDef        = 0x00000001,
+    ModuleDef          = 0x00000002,
+    Namespace          = 0x00000004,
+    TypeDef            = 0x00000008,
+    FieldDef           = 0x00000010,
+    MethodDef          = 0x00000020,
+    PropertyDef        = 0x00000040,
+    EventDef           = 0x00000080,
+    // ... and more
+}
+```
+
+## Filtering results
+
+Use the **filter dropdown** to the left of the search box to restrict results to a specific member category. Selecting **All** searches every category simultaneously. The filter maps directly to a combination of `VisibleMembersFlags` values.
+
+## Search options
+
+<Tabs>
+  <Tab title="Keyword search">
+    Type any substring into the search box. The search is **case-insensitive** by default. Enable **Match case** in the options to switch to a case-sensitive match.
+  </Tab>
+  <Tab title="Regular expression search">
+    Enable **Use regular expressions** to treat your search term as a .NET regex pattern. This lets you search for members matching patterns like `Get[A-Z]\w+` to find all getter-style methods.
+  </Tab>
+</Tabs>
+
+<Tip>
+  Regular expression search also works against decompiled data such as XAML, because `DocumentSearcherOptions.SearchDecompiledData` is enabled by default.
+</Tip>
+
+## Search limits
+
+The searcher returns up to **10,000 results** (`DocumentSearcherOptions.DEFAULT_MAX_RESULTS`). If this limit is reached, `IDocumentSearcher.TooManyResults` is set to `true` and the search stops early. Refine your query or apply a tighter filter to stay within the limit.
+
+## Navigating results
+
+<Steps>
+  <Step title="Run the search">
+    Press **Ctrl+Shift+F** and type your search term. Results appear in the list below as dnSpy scans each assembly.
+  </Step>
+  <Step title="Jump to definition">
+    Double-click any result to navigate directly to that member in the assembly tree and decompiler view.
+  </Step>
+  <Step title="Refine the query">
+    Adjust the filter dropdown or toggle case sensitivity and regex options, then re-run the search.
+  </Step>
+</Steps>
+
+## Related pages
+
+- [Analyzer](/features/analyzer) — find callers, overrides, and usages for a specific member
+- [Assembly Editor overview](/assembly-editor/overview) — edit the members you find

@@ -1,0 +1,127 @@
+---
+title: "Set breakpoints and tracepoints in the dnSpy debugger"
+description: "Set, configure, and manage code breakpoints and tracepoints. Add conditions, hit count filters, and trace messages to control when execution pauses."
+---
+
+Breakpoints let you pause execution at a specific line of code. dnSpy extends the basic breakpoint with conditions, hit count rules, trace messages, and filters — all configurable through a right-click menu on any breakpoint. You can also export your breakpoint set to XML and import it later or share it with others.
+
+## Setting a breakpoint
+
+<Steps>
+  <Step title="Navigate to the line">
+    Open the assembly you want to debug and navigate to the method and line where you want to pause.
+  </Step>
+  <Step title="Toggle the breakpoint">
+    Click in the gutter (the grey margin to the left of the code) or press **F9** with the cursor on the target line. A red dot appears to indicate the breakpoint is active.
+  </Step>
+  <Step title="Start debugging">
+    Press **F5** to start or continue debugging. Execution pauses when the line is reached.
+  </Step>
+</Steps>
+
+<Tip>
+  Press **F9** a second time on a line with an active breakpoint to remove it. To disable it without removing it, right-click the breakpoint glyph and choose **Disable Breakpoint**.
+</Tip>
+
+## Conditional breakpoints
+
+A conditional breakpoint only pauses when a C# or Visual Basic expression evaluates to a specific result. This lets you skip the first 999 iterations of a loop, for example, and break only when a particular value appears.
+
+<Steps>
+  <Step title="Open breakpoint settings">
+    Right-click the breakpoint glyph in the gutter and select **Edit Breakpoint Settings**.
+  </Step>
+  <Step title="Enable the condition">
+    Check the **Condition** checkbox in the settings dialog.
+  </Step>
+  <Step title="Choose the condition kind">
+    Select either **Is true** (`DbgCodeBreakpointConditionKind.IsTrue`) to break when an expression is truthy, or **When changed** (`DbgCodeBreakpointConditionKind.WhenChanged`) to break whenever the expression value changes between hits.
+  </Step>
+  <Step title="Enter the expression">
+    Type a C# or Visual Basic expression in the **Condition** field. The expression runs in the context of the current stack frame, so local variables and `this` are accessible.
+
+    ```csharp
+    index == 42
+    ```
+  </Step>
+</Steps>
+
+## Tracepoints
+
+A tracepoint logs a message to the **Output** window instead of pausing the debugger. Use tracepoints to trace execution flow without stopping the process.
+
+<Steps>
+  <Step title="Open breakpoint settings">
+    Right-click an existing breakpoint glyph and select **Edit Breakpoint Settings**, or create a new breakpoint first.
+  </Step>
+  <Step title="Enable the trace message">
+    Check the **Trace message** checkbox.
+  </Step>
+  <Step title="Set Continue to true">
+    Make sure **Continue execution** is checked. This is the `DbgCodeBreakpointTrace.Continue` flag. When set, the process keeps running after the message is logged, making this a tracepoint rather than a breakpoint.
+  </Step>
+  <Step title="Write the message">
+    Enter the message text in the **Message** field. You can embed expressions in curly braces:
+
+    ```text
+    Hit index={index}, value={myArray[index]}
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  If **Continue** is unchecked on a breakpoint that has a trace message, the process pauses after logging — combining the behaviour of a breakpoint and a tracepoint.
+</Note>
+
+## Hit count conditions
+
+You can tell a breakpoint to pause only on specific hits using a `DbgCodeBreakpointHitCount` rule. Open **Edit Breakpoint Settings** and check **Hit count**, then choose one of the following modes:
+
+| Mode | Meaning |
+|---|---|
+| **Equals** (`DbgCodeBreakpointHitCountKind.Equals`) | Pause when the hit count exactly equals the value |
+| **Multiple of** (`DbgCodeBreakpointHitCountKind.MultipleOf`) | Pause when `(hit count % value) == 0` |
+| **Greater than or equals** (`DbgCodeBreakpointHitCountKind.GreaterThanOrEquals`) | Pause when the hit count is at or above the value |
+
+## The Breakpoints window
+
+The **Breakpoints** window gives you a table view of every breakpoint and tracepoint in your session. Open it from **Debug** > **Windows** > **Breakpoints**.
+
+From the window you can:
+
+- Enable or disable individual breakpoints with the checkbox in the first column
+- See the current bound status and any warning or error messages
+- Edit settings by double-clicking a row
+- Delete one or more breakpoints with the **Delete** key
+
+## Break on thrown exceptions
+
+To pause when a specific exception type is thrown (first chance), go to **Debug** > **Windows** > **Exception Settings**. Find the exception type in the list and check the box next to it. dnSpy breaks as soon as the exception is thrown, before any `catch` block runs.
+
+<Tip>
+  First-chance exception breaks are especially useful for catching exceptions that are silently swallowed inside third-party code.
+</Tip>
+
+## Export and import breakpoints
+
+You can save your breakpoints to an XML file and reload them later:
+
+<Steps>
+  <Step title="Export">
+    In the **Breakpoints** window, right-click and choose **Export Breakpoints**. Save the XML file to a location of your choice.
+  </Step>
+  <Step title="Import">
+    Right-click in the **Breakpoints** window and choose **Import Breakpoints**, then open the XML file. Existing breakpoints are preserved; imported ones are added.
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Variables and evaluation" icon="brackets-curly" href="/debugger/variables-and-evaluation">
+    Use the Locals, Watch, and Autos windows to inspect and evaluate expressions at runtime.
+  </Card>
+  <Card title="Debugger overview" icon="bug" href="/debugger/overview">
+    Learn how to start a debug session, step through code, and use the Output window.
+  </Card>
+</CardGroup>

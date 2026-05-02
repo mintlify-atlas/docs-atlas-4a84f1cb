@@ -1,0 +1,592 @@
+---
+title: "Debugger API reference for building dnSpy extensions"
+description: "Reference for DbgManager, DbgProcess, DbgThread, DbgModule, DbgObject, and expression evaluation types used to build debugger extensions."
+---
+
+The debugger API gives your extension full access to the running debug session — you can start and stop processes, enumerate threads and modules, attach custom data to debugger objects, and evaluate expressions in the context of a paused thread. All debugger events are raised on the debugger dispatcher thread, and every debugger object is a `DbgObject` that supports attached custom data.
+
+<CardGroup cols={2}>
+  <Card title="DbgManager" icon="play" href="/extensions/api/debugger-api#dbgmanager">
+    Top-level service for starting, stopping, and controlling debug sessions.
+  </Card>
+  <Card title="DbgProcess" icon="server" href="/extensions/api/debugger-api#dbgprocess">
+    Represents a single debugged process.
+  </Card>
+  <Card title="DbgThread" icon="list" href="/extensions/api/debugger-api#dbgthread">
+    Represents a thread within a debugged process.
+  </Card>
+  <Card title="DbgModule" icon="puzzle-piece" href="/extensions/api/debugger-api#dbgmodule">
+    Represents a loaded module within a runtime.
+  </Card>
+  <Card title="DbgObject" icon="database" href="/extensions/api/debugger-api#dbgobject">
+    Base class with typed data storage for all debugger objects.
+  </Card>
+  <Card title="Expression evaluator" icon="square-root-variable" href="/extensions/api/debugger-api#expression-evaluation">
+    Evaluate C# or VB expressions against a paused thread.
+  </Card>
+</CardGroup>
+
+## DbgManager
+
+`DbgManager` is the entry point for the entire debugging subsystem. Import it via MEF to control debugging sessions and subscribe to process-level events.
+
+```csharp
+[Export]
+sealed class MyDebuggerComponent {
+    readonly DbgManager dbgManager;
+
+    [ImportingConstructor]
+    MyDebuggerComponent(DbgManager dbgManager) =>
+        this.dbgManager = dbgManager;
+}
+```
+
+<Note>
+  If you need to hook events before the first debug session starts, export `IDbgManagerStartListener` instead. Its `OnStart` method is called the very first time `DbgManager.Start` is invoked, before any process is created.
+</Note>
+
+### Control methods
+
+<ParamField path="Start" type="string?">
+  Starts a new debug session using the provided `DebugProgramOptions`. Returns an error string on failure, or `null` on success.
+</ParamField>
+
+<ParamField path="Restart" type="void">
+  Restarts all debugged programs. Check `CanRestart` before calling.
+</ParamField>
+
+<ParamField path="StopDebuggingAll" type="void">
+  Ends the debug session. Programs that were launched by dnSpy are terminated; programs that were attached to are detached when possible.
+</ParamField>
+
+<ParamField path="TerminateAll" type="void">
+  Terminates all debugged programs unconditionally.
+</ParamField>
+
+<ParamField path="DetachAll" type="void">
+  Detaches from all programs. If a program cannot be detached, it is terminated instead. Check `CanDetachWithoutTerminating` first when this distinction matters.
+</ParamField>
+
+<ParamField path="BreakAll" type="void">
+  Pauses all currently running processes.
+</ParamField>
+
+<ParamField path="RunAll" type="void">
+  Resumes all paused processes. This is the counterpart of `BreakAll`.
+</ParamField>
+
+<ParamField path="Run" type="void">
+  Resumes a single `DbgProcess`. Depending on `DebuggerSettings.BreakAllProcesses`, other processes may also resume.
+</ParamField>
+
+### State properties
+
+<ResponseField name="IsDebugging" type="bool">
+  `true` while at least one debug session is active. Subscribe to `IsDebuggingChanged` to track transitions.
+</ResponseField>
+
+<ResponseField name="IsRunning" type="bool?">
+  `true` when all processes are running, `false` when all are paused, and `null` when some are running and some are paused. Only meaningful when `IsDebugging` is `true`.
+</ResponseField>
+
+<ResponseField name="CanRestart" type="bool">
+  `true` when `Restart` can be called.
+</ResponseField>
+
+<ResponseField name="CanDetachWithoutTerminating" type="bool">
+  `true` when `DetachAll` can complete without terminating any process.
+</ResponseField>
+
+<ResponseField name="Processes" type="DbgProcess[]">
+  All processes currently being debugged. May be empty even while `IsDebugging` is `true` if a process has not been created yet.
+</ResponseField>
+
+<ResponseField name="Dispatcher" type="DbgDispatcher">
+  The dispatcher that all debugger events are raised on. `DbgObject.Close` is also called on this thread.
+</ResponseField>
+
+### Current object properties
+
+<ResponseField name="CurrentProcess" type="DbgCurrentObject<DbgProcess>">
+  The currently selected process, and the process that caused the debugger to enter break mode. Subscribe to `CurrentProcessChanged` for updates.
+</ResponseField>
+
+<ResponseField name="CurrentRuntime" type="DbgCurrentObject<DbgRuntime>">
+  The currently selected runtime. Subscribe to `CurrentRuntimeChanged` for updates.
+</ResponseField>
+
+<ResponseField name="CurrentThread" type="DbgCurrentObject<DbgThread>">
+  The currently selected thread. Subscribe to `CurrentThreadChanged` for updates.
+</ResponseField>
+
+### Key events
+
+| Event | When raised |
+|-------|-------------|
+| `IsDebuggingChanged` | The debugging session starts or ends. |
+| `IsRunningChanged` | Any process changes between running and paused. |
+| `ProcessesChanged` | A process is added to or removed from `Processes`. |
+| `ProcessPaused` | A process enters break mode. |
+| `Message` | A generic debugger message (process created, thread exited, etc.). |
+| `ModulesRefreshed` | A module's in-memory image was updated. |
+
+### Writing output
+
+```csharp
+// Write to the Output window
+dbgManager.WriteMessage("Hello from my extension");
+
+// Show an error in the UI
+dbgManager.ShowError("Something went wrong");
+```
+
+---
+
+## IDbgManagerStartListener
+
+Export this interface to run initialization code exactly once, the first time a debug session starts. This is the correct pattern for subscribing to `DbgManager` events when you cannot import `DbgManager` directly in your constructor (for example, to avoid circular dependencies).
+
+```csharp
+[Export(typeof(IDbgManagerStartListener))]
+sealed class MyStartListener : IDbgManagerStartListener {
+    public void OnStart(DbgManager dbgManager) {
+        dbgManager.IsDebuggingChanged += OnIsDebuggingChanged;
+        dbgManager.ProcessesChanged += OnProcessesChanged;
+    }
+
+    void OnIsDebuggingChanged(object? sender, EventArgs e) {
+        var mgr = (DbgManager)sender!;
+        if (mgr.IsDebugging)
+            Console.WriteLine("Debug session started");
+    }
+
+    void OnProcessesChanged(object? sender, DbgCollectionChangedEventArgs<DbgProcess> e) {
+        foreach (var process in e.AddedItems)
+            Console.WriteLine($"New process: {process.Name} (PID {process.Id})");
+    }
+}
+```
+
+<ResponseField name="OnStart" type="void">
+  Called the first time `DbgManager.Start` is invoked. The `dbgManager` parameter is the live instance you should store and use to subscribe to events.
+</ResponseField>
+
+---
+
+## DbgProcess
+
+`DbgProcess` represents a single debugged process. Obtain instances from `DbgManager.Processes` or from process-related events.
+
+```csharp
+public abstract class DbgProcess : DbgObject, INotifyPropertyChanged {
+    public abstract DbgManager DbgManager { get; }
+    public abstract int Id { get; }
+    public abstract int Bitness { get; }
+    public abstract DbgArchitecture Architecture { get; }
+    public abstract DbgOperatingSystem OperatingSystem { get; }
+    public abstract DbgProcessState State { get; }
+    public abstract string Filename { get; }
+    public abstract string Name { get; }
+    public abstract DbgThread[] Threads { get; }
+    public abstract DbgRuntime[] Runtimes { get; }
+    public abstract bool IsRunning { get; }
+    // ...
+}
+```
+
+### Properties
+
+<ResponseField name="Id" type="int">
+  The OS process ID.
+</ResponseField>
+
+<ResponseField name="Bitness" type="int">
+  `32` or `64`. Use `PointerSize` (computed as `Bitness / 8`) when you need the pointer size in bytes.
+</ResponseField>
+
+<ResponseField name="Architecture" type="DbgArchitecture">
+  One of `X86`, `X64`, `Arm`, or `Arm64`.
+</ResponseField>
+
+<ResponseField name="OperatingSystem" type="DbgOperatingSystem">
+  One of `Windows`, `MacOS`, `Linux`, or `FreeBSD`.
+</ResponseField>
+
+<ResponseField name="State" type="DbgProcessState">
+  `Running`, `Paused`, or `Terminated`.
+</ResponseField>
+
+<ResponseField name="Filename" type="string">
+  Absolute path to the executable on disk, or an empty string if unknown.
+</ResponseField>
+
+<ResponseField name="Name" type="string">
+  Process name, or an empty string if unknown.
+</ResponseField>
+
+<ResponseField name="Threads" type="DbgThread[]">
+  All threads in the process. Subscribe to `ThreadsChanged` for updates.
+</ResponseField>
+
+<ResponseField name="Runtimes" type="DbgRuntime[]">
+  All runtimes (CLR instances) in the process. Subscribe to `RuntimesChanged` for updates.
+</ResponseField>
+
+<ResponseField name="IsRunning" type="bool">
+  `true` when the process is executing; `false` when paused or terminated.
+</ResponseField>
+
+<ResponseField name="ShouldDetach" type="bool">
+  Controls whether `StopDebugging()` detaches from (`true`) or terminates (`false`) this process.
+</ResponseField>
+
+### Control methods
+
+<ParamField path="Break" type="void">
+  Pauses the process.
+</ParamField>
+
+<ParamField path="Run" type="void">
+  Resumes the process.
+</ParamField>
+
+<ParamField path="Detach" type="void">
+  Detaches from the process without terminating it (if the runtime supports detach).
+</ParamField>
+
+<ParamField path="Terminate" type="void">
+  Terminates the process.
+</ParamField>
+
+### Memory access
+
+```csharp
+// Read 16 bytes at a given address
+byte[] data = process.ReadMemory(address: 0x00400000UL, size: 16);
+
+// Write bytes to the process
+process.WriteMemory(address: 0x00400000UL, source: patchedBytes);
+```
+
+---
+
+## DbgThread
+
+`DbgThread` represents a single thread inside a debugged process. Obtain instances from `DbgProcess.Threads` or from thread-related events.
+
+```csharp
+public abstract class DbgThread : DbgObject, INotifyPropertyChanged {
+    public abstract DbgRuntime Runtime { get; }
+    public DbgProcess Process => Runtime.Process;
+    public abstract DbgAppDomain? AppDomain { get; }
+    public abstract string Kind { get; }
+    public abstract ulong Id { get; }
+    public abstract ulong? ManagedId { get; }
+    public abstract string Name { get; }
+    public abstract string UIName { get; set; }
+    public abstract int SuspendedCount { get; }
+    // ...
+}
+```
+
+### Properties
+
+<ResponseField name="Id" type="ulong">
+  The OS thread ID.
+</ResponseField>
+
+<ResponseField name="ManagedId" type="ulong?">
+  The managed thread ID, or `null` for native threads or when the ID is unavailable.
+</ResponseField>
+
+<ResponseField name="Kind" type="string">
+  The thread category. Compare against `PredefinedThreadKinds` constants — for example, `PredefinedThreadKinds.Main`.
+</ResponseField>
+
+<ResponseField name="IsMain" type="bool">
+  Shorthand for `Kind == PredefinedThreadKinds.Main`.
+</ResponseField>
+
+<ResponseField name="Name" type="string">
+  The thread name as reported by the runtime.
+</ResponseField>
+
+<ResponseField name="UIName" type="string">
+  The thread name shown in the Threads window. You can set this from your extension to give threads friendly display names.
+</ResponseField>
+
+<ResponseField name="SuspendedCount" type="int">
+  `0` when the thread is not suspended; a positive value indicates the number of nested suspensions.
+</ResponseField>
+
+<ResponseField name="AppDomain" type="DbgAppDomain?">
+  The AppDomain this thread belongs to, or `null` for process-level threads.
+</ResponseField>
+
+### Stack access
+
+```csharp
+// Get the top frame without allocating a full walker
+DbgStackFrame? top = thread.GetTopStackFrame();
+
+// Get the first 10 frames
+DbgStackFrame[] frames = thread.GetFrames(10);
+
+// Walk the stack manually
+using var walker = thread.CreateStackWalker();
+var batch = walker.GetNextStackFrames(50);
+```
+
+---
+
+## DbgModule
+
+`DbgModule` represents a module loaded into a runtime. Obtain instances from `DbgRuntime.Modules` or from `DbgManager.MessageModuleLoaded` events.
+
+```csharp
+public abstract class DbgModule : DbgObject, INotifyPropertyChanged {
+    public abstract DbgRuntime Runtime { get; }
+    public DbgProcess Process => Runtime.Process;
+    public abstract DbgAppDomain? AppDomain { get; }
+    public abstract bool IsExe { get; }
+    public abstract ulong Address { get; }
+    public abstract uint Size { get; }
+    public abstract string Name { get; }
+    public abstract string Filename { get; }
+    public abstract bool IsDynamic { get; }
+    public abstract bool IsInMemory { get; }
+    public abstract bool? IsOptimized { get; }
+    public abstract int Order { get; }
+    public abstract DateTime? Timestamp { get; }
+    public abstract string Version { get; }
+    // ...
+}
+```
+
+### Properties
+
+<ResponseField name="Name" type="string">
+  The short module name.
+</ResponseField>
+
+<ResponseField name="Filename" type="string">
+  Absolute path on disk, or a longer identifier for in-memory or dynamic modules.
+</ResponseField>
+
+<ResponseField name="IsExe" type="bool">
+  `true` for EXE files; `false` for DLLs.
+</ResponseField>
+
+<ResponseField name="Address" type="ulong">
+  Base address in the debugged process. Only valid when `HasAddress` is `true`.
+</ResponseField>
+
+<ResponseField name="Size" type="uint">
+  Size of the module image in bytes. Only valid when `HasAddress` is `true`.
+</ResponseField>
+
+<ResponseField name="HasAddress" type="bool">
+  `true` when both `Address` and `Size` are valid.
+</ResponseField>
+
+<ResponseField name="IsDynamic" type="bool">
+  `true` for modules generated at runtime (for example, `System.Reflection.Emit` assemblies) where new types can be added after load.
+</ResponseField>
+
+<ResponseField name="IsInMemory" type="bool">
+  `true` for modules that exist only in memory with no backing file on disk.
+</ResponseField>
+
+<ResponseField name="IsOptimized" type="bool?">
+  `true` for JIT-optimized modules, `false` for debug builds, and `null` for native modules.
+</ResponseField>
+
+<ResponseField name="Order" type="int">
+  Load order index. Earlier-loaded modules have a lower order.
+</ResponseField>
+
+<ResponseField name="Version" type="string">
+  File version string from the PE header.
+</ResponseField>
+
+<ResponseField name="Timestamp" type="DateTime?">
+  Timestamp from the PE header in UTC, or `null` if unavailable.
+</ResponseField>
+
+---
+
+## DbgObject
+
+`DbgObject` is the base class for every debugger object — `DbgProcess`, `DbgThread`, `DbgModule`, and more. It provides typed data storage that lets extensions attach arbitrary state to any debugger object without subclassing.
+
+```csharp
+public abstract class DbgObject {
+    public bool IsClosed { get; }
+    public event EventHandler? Closed;
+
+    public T GetOrCreateData<T>() where T : class, new();
+    public T GetOrCreateData<T>(Func<T> create) where T : class;
+    public bool TryGetData<T>(out T? value) where T : class;
+    public T GetData<T>() where T : class;
+    public bool HasData<T>() where T : class;
+}
+```
+
+### Typed data storage
+
+The `GetOrCreateData<T>` pattern is the primary way extensions attach their own state to debugger objects. The data is thread-safe and automatically disposed (if `IDisposable`) when the `DbgObject` is closed.
+
+```csharp
+sealed class MyModuleData {
+    public string? DeobfuscatedName { get; set; }
+}
+
+// Attach data the first time; retrieve it on subsequent calls
+var data = module.GetOrCreateData<MyModuleData>();
+data.DeobfuscatedName = "MyApp.Core";
+
+// Later, in another component
+if (module.TryGetData<MyModuleData>(out var existing))
+    Console.WriteLine(existing.DeobfuscatedName);
+```
+
+<ResponseField name="GetOrCreateData<T>" type="T">
+  Returns the existing data of type `T` if it was previously attached, or creates a new instance using `new T()` or a provided factory delegate. The data lives as long as the `DbgObject` itself.
+</ResponseField>
+
+<ResponseField name="TryGetData<T>" type="bool">
+  Retrieves existing data of type `T` without creating it. Returns `false` and sets the out parameter to `null` if no data of that type is attached.
+</ResponseField>
+
+<ResponseField name="GetData<T>" type="T">
+  Like `TryGetData<T>` but throws `InvalidOperationException` when the data does not exist. Use when the data is expected to always be present.
+</ResponseField>
+
+<ResponseField name="HasData<T>" type="bool">
+  Returns `true` when data of type `T` has been attached to this object.
+</ResponseField>
+
+<ResponseField name="IsClosed" type="bool">
+  `true` after `Close` has been called. Accessing most properties on a closed object is undefined.
+</ResponseField>
+
+<ResponseField name="Closed" type="EventHandler?">
+  Raised on the dispatcher thread just before the object and its attached data are disposed.
+</ResponseField>
+
+---
+
+## Expression evaluation
+
+The expression evaluator lets you evaluate C# or Visual Basic expressions against a paused thread and read back typed result values.
+
+### DbgExpressionEvaluator
+
+Obtain the evaluator from the current language via `DbgLanguage.ExpressionEvaluator`.
+
+```csharp
+public abstract class DbgExpressionEvaluator {
+    public abstract DbgLanguage Language { get; }
+    public abstract object? CreateExpressionEvaluatorState();
+    public abstract DbgEvaluationResult Evaluate(
+        DbgEvaluationInfo evalInfo,
+        string expression,
+        DbgEvaluationOptions options,
+        object? state);
+    public abstract DbgEEAssignmentResult Assign(
+        DbgEvaluationInfo evalInfo,
+        string expression,
+        string valueExpression,
+        DbgEvaluationOptions options);
+}
+```
+
+<ParamField path="Evaluate" type="DbgEvaluationResult">
+  Evaluates `expression` in the context of `evalInfo`. The returned `DbgValue` is automatically closed when the runtime continues.
+
+  <Expandable title="parameters">
+    <ParamField path="evalInfo" type="DbgEvaluationInfo" required>
+      Supplies the thread, frame, and language context for the evaluation.
+    </ParamField>
+    <ParamField path="expression" type="string" required>
+      The expression to evaluate, for example `"myList.Count"`.
+    </ParamField>
+    <ParamField path="options" type="DbgEvaluationOptions" required>
+      Flags controlling evaluation behavior. Use `DbgEvaluationOptions.Expression` for a standard expression evaluation.
+    </ParamField>
+    <ParamField path="state" type="object?">
+      Optional state object from `CreateExpressionEvaluatorState()`. Pass `null` to use the context's built-in state.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="Assign" type="DbgEEAssignmentResult">
+  Assigns the value of `valueExpression` (rhs) to `expression` (lhs). Returns an error message in `DbgEEAssignmentResult.Error` if the assignment failed.
+</ParamField>
+
+### DbgEvaluationOptions flags
+
+| Flag | Description |
+|------|-------------|
+| `Expression` | Treat the input as an expression rather than a statement. |
+| `NoSideEffects` | Fail if evaluation would cause side effects such as method calls. |
+| `NoFuncEval` | Disable calling code in the debuggee entirely. |
+| `RawLocals` | Show raw metadata locals instead of remapped captured variables. |
+
+### DbgEvaluationResult
+
+<ResponseField name="Value" type="DbgValue?">
+  The evaluated value, or `null` when `Error` is non-null.
+</ResponseField>
+
+<ResponseField name="Error" type="string?">
+  An error message when evaluation failed, or `null` on success.
+</ResponseField>
+
+<ResponseField name="Flags" type="DbgEvaluationResultFlags">
+  Flags describing the result — for example, `SideEffects`, `ReadOnly`, or `ThrownException`.
+</ResponseField>
+
+<ResponseField name="IsThrownException" type="bool">
+  `true` when the result is an exception thrown during evaluation rather than a normal return value.
+</ResponseField>
+
+### DbgValue
+
+`DbgValue` holds the result of a successful expression evaluation. It extends `DbgObject` so you can attach custom data to it.
+
+```csharp
+public abstract class DbgValue : DbgObject {
+    public DbgProcess Process => Runtime.Process;
+    public abstract DbgRuntime Runtime { get; }
+    public abstract DbgSimpleValueType ValueType { get; }
+    public abstract bool HasRawValue { get; }
+    public abstract object? RawValue { get; }
+    public abstract DbgRawAddressValue? GetRawAddressValue(bool onlyDataAddress);
+}
+```
+
+<ResponseField name="ValueType" type="DbgSimpleValueType">
+  The type of the raw value. Common values include `Boolean`, `Int32`, `Int64`, `Float64`, `StringUtf16`, and `Other` for complex reference types.
+</ResponseField>
+
+<ResponseField name="HasRawValue" type="bool">
+  `true` when `RawValue` contains the actual boxed primitive. `false` for complex types that have no simple representation.
+</ResponseField>
+
+<ResponseField name="RawValue" type="object?">
+  A boxed primitive matching `ValueType`. For example, when `ValueType` is `Int32`, cast `RawValue` to `int`. A `null` raw value is valid and represents a null reference.
+</ResponseField>
+
+#### Reading a value
+
+```csharp
+var result = evaluator.Evaluate(evalInfo, "myInt", DbgEvaluationOptions.Expression, null);
+
+if (result.Error is null && result.Value is { } val) {
+    if (val.ValueType == DbgSimpleValueType.Int32 && val.HasRawValue)
+        Console.WriteLine($"myInt = {(int)val.RawValue!}");
+    else if (val.ValueType == DbgSimpleValueType.StringUtf16)
+        Console.WriteLine($"myString = {(string?)val.RawValue}");
+}
+```

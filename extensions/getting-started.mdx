@@ -1,0 +1,210 @@
+---
+title: "Build and deploy your first dnSpy extension in C#"
+description: "Create a class library project, implement IExtension with MEF exports, add a menu command, and copy the DLL to the dnSpy directory to load it."
+---
+
+This guide walks you through creating a minimal dnSpy extension that adds a menu item to the main menu bar. By the end you will have a working DLL that dnSpy auto-discovers and loads at startup.
+
+## Prerequisites
+
+- **.NET SDK** 5.0 or later (for building), or Visual Studio 2019+ / JetBrains Rider
+- **dnSpy source repository** cloned locally, or the `dnSpy.Contracts.DnSpy` NuGet package available
+- Basic familiarity with C# and MEF (`[Export]`, `[Import]`)
+
+<Note>
+dnSpy itself targets both `net48` and `net5.0-windows`. Your extension must target at least one of those frameworks. The examples in the source repository inherit `TargetFrameworks` from `DnSpyCommon.props`, which sets `net48;net5.0-windows`.
+</Note>
+
+## Create the project
+
+<Steps>
+  <Step title="Create a new class library">
+    Create a class library that targets `net48` (for .NET Framework) or `net5.0-windows` (for .NET 5). Using the WPF SDK variant is recommended because dnSpy is a WPF application.
+
+    ```xml
+    <Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+
+      <PropertyGroup>
+        <AssemblyName>MyExtension.x</AssemblyName>
+        <TargetFrameworks>net48;net5.0-windows</TargetFrameworks>
+        <Nullable>enable</Nullable>
+        <UseWPF>true</UseWPF>
+      </PropertyGroup>
+
+    </Project>
+    ```
+
+    <Tip>
+    dnSpy looks for DLLs with any name, but the convention used by the built-in extensions is to append `.x` to the assembly name (e.g., `Example1.Extension.x.dll`). This is not required, but it keeps extension DLLs visually distinct.
+    </Tip>
+  </Step>
+
+  <Step title="Reference dnSpy.Contracts.DnSpy">
+    If you are working inside the dnSpy source tree, add a project reference:
+
+    ```xml
+    <ItemGroup>
+      <ProjectReference Include="path\to\dnSpy\dnSpy.Contracts.DnSpy\dnSpy.Contracts.DnSpy.csproj" />
+      <ProjectReference Include="path\to\dnSpy\dnSpy.Contracts.Logic\dnSpy.Contracts.Logic.csproj" />
+    </ItemGroup>
+    ```
+
+    Alternatively, reference the NuGet package directly:
+
+    ```xml
+    <ItemGroup>
+      <PackageReference Include="dnSpy.Contracts.DnSpy" Version="6.1.8" />
+    </ItemGroup>
+    ```
+  </Step>
+
+  <Step title="Implement IExtension">
+    Every extension must export exactly one class that implements `IExtension`. Decorate it with `[ExportExtension]` so MEF discovers it.
+
+    ```csharp
+    using System.Collections.Generic;
+    using dnSpy.Contracts.Extension;
+
+    namespace MyExtension {
+        [ExportExtension]
+        sealed class TheExtension : IExtension {
+            public IEnumerable<string> MergedResourceDictionaries {
+                get {
+                    // Yield relative paths to any XAML resource dictionaries
+                    // your extension needs to merge into the application resources.
+                    yield break;
+                }
+            }
+
+            public ExtensionInfo ExtensionInfo => new ExtensionInfo {
+                ShortDescription = "My first extension",
+            };
+
+            public void OnEvent(ExtensionEvent @event, object? obj) {
+                // Respond to Loaded, AppLoaded, or AppExit if needed.
+            }
+        }
+    }
+    ```
+
+    See [IExtension interface and MEF composition](/extensions/extension-interface) for a full description of each member.
+  </Step>
+
+  <Step title="Add a menu command">
+    Menu items are MEF exports. Use `[ExportMenu]` to declare a new top-level menu, then `[ExportMenuItem]` to populate it with commands.
+
+    ```csharp
+    using dnSpy.Contracts.App;
+    using dnSpy.Contracts.Menus;
+
+    namespace MyExtension {
+        static class MenuConstants {
+            // Use a unique GUID for your menu.
+            public const string APP_MENU_MY_EXTENSION = "YOUR-GUID-HERE";
+            public const string GROUP_MY_MENU = "0,YOUR-GROUP-GUID-HERE";
+        }
+
+        // Declare the top-level menu entry.
+        [ExportMenu(
+            OwnerGuid = MenuConstants.APP_MENU_GUID,
+            Guid = MenuConstants.APP_MENU_MY_EXTENSION,
+            Order = MenuConstants.ORDER_APP_MENU_DEBUG + 0.1,
+            Header = "_MyExtension")]
+        sealed class MyMenu : IMenu { }
+
+        // Add a command to the menu.
+        [ExportMenuItem(
+            OwnerGuid = MenuConstants.APP_MENU_MY_EXTENSION,
+            Header = "Say hello",
+            Group = MenuConstants.GROUP_MY_MENU,
+            Order = 0)]
+        sealed class HelloCommand : MenuItemBase {
+            public override void Execute(IMenuItemContext context) =>
+                MsgBox.Instance.Show("Hello from MyExtension!");
+        }
+    }
+    ```
+
+    <Tip>
+    Replace `YOUR-GUID-HERE` and `YOUR-GROUP-GUID-HERE` with freshly generated GUIDs. Every menu and group needs a unique GUID to avoid collisions with other extensions.
+    </Tip>
+  </Step>
+
+  <Step title="Persist settings">
+    Use `ISettingsService` to read and write your extension's settings. Inject it via `[ImportingConstructor]` and use a unique GUID to scope your settings section.
+
+    ```csharp
+    using System;
+    using System.ComponentModel;
+    using System.ComponentModel.Composition;
+    using dnSpy.Contracts.MVVM;
+    using dnSpy.Contracts.Settings;
+
+    namespace MyExtension {
+        // Export so other classes in your extension can [Import] it.
+        [Export(typeof(MySettings))]
+        sealed class MySettings : ViewModelBase {
+            static readonly Guid SETTINGS_GUID =
+                new Guid("YOUR-SETTINGS-GUID-HERE");
+
+            readonly ISettingsService settingsService;
+
+            public bool EnableFeature {
+                get => enableFeature;
+                set {
+                    if (enableFeature != value) {
+                        enableFeature = value;
+                        OnPropertyChanged(nameof(EnableFeature));
+                    }
+                }
+            }
+            bool enableFeature = true;
+
+            [ImportingConstructor]
+            public MySettings(ISettingsService settingsService) {
+                this.settingsService = settingsService;
+
+                var sect = settingsService.GetOrCreateSection(SETTINGS_GUID);
+                EnableFeature = sect.Attribute<bool?>(nameof(EnableFeature))
+                    ?? EnableFeature;
+
+                PropertyChanged += OnPropertyChanged;
+            }
+
+            void OnPropertyChanged(object? sender, PropertyChangedEventArgs e) {
+                var sect = settingsService.RecreateSection(SETTINGS_GUID);
+                sect.Attribute(nameof(EnableFeature), EnableFeature);
+            }
+        }
+    }
+    ```
+
+    `GetOrCreateSection` retrieves the settings section on first run (or creates it with defaults). `RecreateSection` replaces it on every property change so settings are always up to date.
+  </Step>
+
+  <Step title="Build and deploy">
+    Build the project, then copy the output DLL to the dnSpy installation directory.
+
+    ```bash
+    dotnet build -c Release
+    cp bin/Release/net48/MyExtension.x.dll /path/to/dnSpy/
+    ```
+
+    Launch dnSpy. Your **_MyExtension** menu should appear in the menu bar.
+
+    <Warning>
+    If the menu does not appear, check that the DLL is in the root of the dnSpy directory (not a subdirectory) and that your `[ExportExtension]` class is `public` or at least accessible to MEF.
+    </Warning>
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="IExtension interface" icon="code" href="/extensions/extension-interface">
+    Learn about lifecycle events, IAutoLoaded, and how to use MEF exports for services and UI elements.
+  </Card>
+  <Card title="UI components API" icon="layout-panel-left" href="/extensions/api/ui-components">
+    Add tool windows, colorizers, treeview nodes, and more advanced UI integration points.
+  </Card>
+</CardGroup>

@@ -1,0 +1,531 @@
+---
+title: "UI extension API: menus, toolbars, tool windows, and themes"
+description: "Reference for adding menu items, toolbar buttons, tool windows, and output panes to dnSpy, plus IThemeService and ITheme for custom UI theming."
+---
+
+dnSpy exposes its entire UI shell to extensions through a set of MEF-based contracts. You can add items to any main menu or context menu, add buttons and widgets to the toolbar, create dockable tool windows, write to output panes, and read theme colors for custom controls — all without patching any existing code.
+
+<CardGroup cols={2}>
+  <Card title="Menu items" icon="list" href="/extensions/api/ui-components#menu-items">
+    Add commands to the main menu or any context menu.
+  </Card>
+  <Card title="Toolbar buttons" icon="rectangle-wide" href="/extensions/api/ui-components#toolbar-buttons">
+    Add icon buttons and custom widgets to the main toolbar.
+  </Card>
+  <Card title="Tool windows" icon="table-columns" href="/extensions/api/ui-components#tool-windows">
+    Create dockable panels with custom WPF content.
+  </Card>
+  <Card title="Output panes" icon="terminal" href="/extensions/api/ui-components#output-panes">
+    Write text to named panes in the Output window.
+  </Card>
+  <Card title="Themes" icon="palette" href="/extensions/api/ui-components#theming">
+    Read the active theme's colors for consistent custom UI.
+  </Card>
+</CardGroup>
+
+## Menu items
+
+To add a command to any menu in dnSpy, implement `IMenuItem` (or extend the convenience base class `MenuItemBase`) and decorate the class with `[ExportMenuItem]`.
+
+### IMenuItem
+
+```csharp
+public interface IMenuItem {
+    bool IsVisible(IMenuItemContext context);
+    bool IsEnabled(IMenuItemContext context);
+    void Execute(IMenuItemContext context);
+    string? GetHeader(IMenuItemContext context);
+    string? GetInputGestureText(IMenuItemContext context);
+    ImageReference? GetIcon(IMenuItemContext context);
+    bool IsChecked(IMenuItemContext context);
+}
+```
+
+`MenuItemBase` provides default implementations for everything except `Execute`, so you typically only need to override `Execute` and, optionally, `IsEnabled` or `IsVisible`.
+
+<ParamField path="Execute" type="void">
+  Called when the user clicks the menu item. `context` gives you access to the current selection and any data objects associated with the menu.
+</ParamField>
+
+<ParamField path="IsVisible" type="bool">
+  Return `false` to hide the item. When hidden, none of the other methods are called. Defaults to `true` in `MenuItemBase`.
+</ParamField>
+
+<ParamField path="IsEnabled" type="bool">
+  Return `false` to disable (grey out) the item. Defaults to `true` in `MenuItemBase`.
+</ParamField>
+
+<ParamField path="GetHeader" type="string?">
+  Return a string to override the `Header` set in `[ExportMenuItem]` at runtime — for example, to make the label context-sensitive. Return `null` to use the attribute value.
+</ParamField>
+
+### ExportMenuItemAttribute
+
+Decorate your `IMenuItem` class with `[ExportMenuItem]` to register it with the menu system:
+
+<ParamField path="OwnerGuid" type="string?">
+  GUID of the parent menu or submenu that will contain this item. Use `MenuConstants.APP_MENU_VIEW_GUID` for the **View** menu, or your own menu's GUID for a custom top-level menu.
+</ParamField>
+
+<ParamField path="Guid" type="string?">
+  Optional GUID for this item. Required if you want other items to use this item as a parent (submenu).
+</ParamField>
+
+<ParamField path="Group" type="string?">
+  Group name in `"order,name"` format. Items in the same group are shown together with a separator between groups.
+</ParamField>
+
+<ParamField path="Order" type="double">
+  Position within the group. Lower numbers appear first.
+</ParamField>
+
+<ParamField path="Header" type="string?">
+  Display name of the menu item. Use `_` as an access key prefix, for example `"_My Command"`.
+</ParamField>
+
+<ParamField path="InputGestureText" type="string?">
+  Keyboard shortcut hint displayed on the right side of the item, for example `"Ctrl+Alt+Z"`. This does not bind the key — register the key separately using `IWpfCommandService`.
+</ParamField>
+
+### Adding a top-level menu and items
+
+This example, from `Example1.Extension`, creates a new **Extension** top-level menu with several commands:
+
+```csharp
+// 1. Declare GUIDs for the new menu and its groups
+static class MainMenuConstants {
+    public const string APP_MENU_EXTENSION = "4E6829A6-AEA0-4803-9344-D19BF0A74DA1";
+    public const string GROUP_EXTENSION_MENU1 = "0,73BEBC37-387A-4004-8076-A1A90A17611B";
+    public const string GROUP_EXTENSION_MENU2 = "10,C21B8B99-A2E4-474F-B4BC-4CF348ECBD0A";
+}
+
+// 2. Register the menu itself — place it right after the Debug menu
+[ExportMenu(
+    OwnerGuid = MenuConstants.APP_MENU_GUID,
+    Guid = MainMenuConstants.APP_MENU_EXTENSION,
+    Order = MenuConstants.ORDER_APP_MENU_DEBUG + 0.1,
+    Header = "_Extension")]
+sealed class ExtensionMenu : IMenu { }
+
+// 3. Add commands to the menu
+[ExportMenuItem(
+    OwnerGuid = MainMenuConstants.APP_MENU_EXTENSION,
+    Header = "Command #1",
+    Group = MainMenuConstants.GROUP_EXTENSION_MENU1,
+    Order = 0)]
+sealed class ExtensionCommand1 : MenuItemBase {
+    public override void Execute(IMenuItemContext context) =>
+        MsgBox.Instance.Show("Command #1");
+}
+
+// 4. Add a command to an existing menu (View)
+[ExportMenuItem(
+    OwnerGuid = MenuConstants.APP_MENU_VIEW_GUID,
+    Header = "Command #1",
+    Group = MenuConstants.GROUP_APP_MENU_VIEW_WINDOWS,
+    Order = 1000)]
+sealed class ViewCommand1 : MenuItemBase {
+    public override void Execute(IMenuItemContext context) =>
+        MsgBox.Instance.Show("View Command #1");
+}
+```
+
+<Tip>
+  To add a menu item to a **context menu** rather than the main menu, set `OwnerGuid = MenuConstants.CTX_MENU_GUID` and register a GUID for the context menu owner via `IMenuService.InitializeContextMenu`.
+</Tip>
+
+---
+
+## Toolbar buttons
+
+The main toolbar is partitioned into named groups. You add a button by decorating a class with `[ExportToolBarButton]` and implementing `ToolBarButtonBase`.
+
+### ExportToolBarButtonAttribute
+
+<ParamField path="Group" type="string?" required>
+  Identifies the toolbar group this button belongs to. Groups are strings in `"order,guid"` format. See `ToolBarConstants` for predefined groups such as `GROUP_APP_TB_MAIN_DEBUG`.
+</ParamField>
+
+<ParamField path="Order" type="double">
+  Position within the group. Lower numbers appear to the left.
+</ParamField>
+
+<ParamField path="Icon" type="string?">
+  Icon name from `DsImagesAttribute`. For example, `DsImagesAttribute.Assembly` shows the assembly icon.
+</ParamField>
+
+<ParamField path="ToolTip" type="string?">
+  Tooltip text shown when the user hovers over the button.
+</ParamField>
+
+### Adding a toolbar button and a custom widget
+
+This example, from `Example1.Extension`, places a button and a combobox between the assembly editor and debugger toolbar sections:
+
+```csharp
+static class TBConstants {
+    // Place between GROUP_APP_TB_MAIN_ASMED_UNDO (4000) and GROUP_APP_TB_MAIN_DEBUG (5000)
+    public const string GROUP_APP_TB_EXTENSION = "4500,AF461C50-6E91-41B8-9771-0BAE9B77BC69";
+}
+
+// A simple icon button
+[ExportToolBarButton(
+    Icon = DsImagesAttribute.Assembly,
+    ToolTip = "Click Me",
+    Group = TBConstants.GROUP_APP_TB_EXTENSION,
+    Order = 0)]
+sealed class TBCommand1 : ToolBarButtonBase {
+    public override void Execute(IToolBarItemContext context) =>
+        MsgBox.Instance.Show("Command #1");
+}
+
+// An arbitrary WPF object (here, a ComboBox)
+[ExportToolBarObject(
+    Group = TBConstants.GROUP_APP_TB_EXTENSION,
+    Order = 10)]
+sealed class TBCommand2 : ToolBarObjectBase {
+    readonly ComboBox comboBox;
+
+    TBCommand2() {
+        comboBox = new ComboBox { Width = 100 };
+        comboBox.Items.Add("Item #1");
+        comboBox.Items.Add("Item #2");
+        comboBox.SelectedIndex = 0;
+    }
+
+    public override object GetUIObject(IToolBarItemContext context, IInputElement? commandTarget) =>
+        comboBox;
+}
+```
+
+Use `[ExportToolBarObject]` with `ToolBarObjectBase` when you need any WPF element — not just a button — in the toolbar.
+
+---
+
+## Tool windows
+
+A tool window is a dockable panel that appears in the dnSpy shell alongside the built-in windows (Locals, Call Stack, and so on). Creating one requires three pieces:
+
+1. A `ToolWindowContent` subclass that owns the WPF content.
+2. An `IToolWindowContentProvider` export that creates and caches the content.
+3. Optionally, a menu item or keyboard shortcut that calls `IDsToolWindowService.Show`.
+
+### ToolWindowContent
+
+```csharp
+public abstract class ToolWindowContent : IUIObjectProvider {
+    public abstract object? UIObject { get; }
+    public abstract IInputElement? FocusedElement { get; }
+    public abstract FrameworkElement? ZoomElement { get; }
+    public abstract Guid Guid { get; }
+    public abstract string Title { get; }
+    public virtual object? ToolTip => null;
+    public virtual void OnVisibilityChanged(ToolWindowContentVisibilityEvent visEvent) { }
+}
+```
+
+<ParamField path="Guid" type="Guid" required>
+  A unique identifier for this tool window. Use a freshly generated GUID per window type and never reuse it across projects.
+</ParamField>
+
+<ParamField path="Title" type="string" required>
+  The text shown in the window's tab.
+</ParamField>
+
+<ParamField path="UIObject" type="object?" required>
+  The WPF element or view model (paired with a `DataTemplate`) that is displayed inside the window.
+</ParamField>
+
+<ParamField path="FocusedElement" type="IInputElement?">
+  The element that receives keyboard focus when the window is activated. Return `null` when focus is not applicable.
+</ParamField>
+
+<ParamField path="ZoomElement" type="FrameworkElement?">
+  The element that receives the zoom `ScaleTransform` when the user zooms in or out. Return `null` to disable zoom.
+</ParamField>
+
+<ParamField path="OnVisibilityChanged" type="void">
+  Called when the window is shown, hidden, added to the layout, or removed. Use this to start or stop background work.
+
+  <Expandable title="ToolWindowContentVisibilityEvent values">
+    <ResponseField name="Added" type="enum value">The content was added to the UI layout.</ResponseField>
+    <ResponseField name="Removed" type="enum value">The content was removed from the UI layout.</ResponseField>
+    <ResponseField name="Visible" type="enum value">The content became visible (tab selected).</ResponseField>
+    <ResponseField name="Hidden" type="enum value">The content was hidden (tab deselected).</ResponseField>
+  </Expandable>
+</ParamField>
+
+### IToolWindowContentProvider
+
+Export this interface so that dnSpy can create and look up your tool window:
+
+```csharp
+[Export(typeof(IToolWindowContentProvider))]
+sealed class MyToolWindowContentProvider : IToolWindowContentProvider {
+    MyToolWindowContent? content;
+
+    public IEnumerable<ToolWindowContentInfo> ContentInfos {
+        get {
+            yield return new ToolWindowContentInfo(
+                MyToolWindowContent.THE_GUID,
+                AppToolWindowLocation.DefaultHorizontal,
+                order: 0,
+                isDefault: false);
+        }
+    }
+
+    public ToolWindowContent? GetOrCreate(Guid guid) {
+        if (guid == MyToolWindowContent.THE_GUID)
+            return content ??= new MyToolWindowContent();
+        return null;
+    }
+}
+```
+
+<ParamField path="ContentInfos" type="IEnumerable<ToolWindowContentInfo>" required>
+  Declares which tool windows this provider can create and their default dock locations. Use `AppToolWindowLocation.DefaultHorizontal` or `DefaultVertical` for sensible defaults.
+</ParamField>
+
+<ParamField path="GetOrCreate" type="ToolWindowContent?">
+  Called by dnSpy when it needs the window. Return your cached instance if `guid` matches your window's GUID; otherwise return `null`.
+</ParamField>
+
+### Complete example
+
+The following pattern is taken from `Example2.Extension` and wires up a tool window with a keyboard shortcut and a **View** menu entry:
+
+```csharp
+// Register a keyboard shortcut (Ctrl+Alt+Z) that shows the window
+[ExportAutoLoaded]
+sealed class ToolWindowLoader : IAutoLoaded {
+    public static readonly RoutedCommand OpenToolWindow =
+        new RoutedCommand("OpenToolWindow", typeof(ToolWindowLoader));
+
+    [ImportingConstructor]
+    ToolWindowLoader(IWpfCommandService wpfCommandService,
+                     IDsToolWindowService toolWindowService) {
+        var cmds = wpfCommandService.GetCommands(ControlConstants.GUID_MAINWINDOW);
+        cmds.Add(OpenToolWindow,
+            new RelayCommand(_ => toolWindowService.Show(MyToolWindowContent.THE_GUID)));
+        cmds.Add(OpenToolWindow,
+            ModifierKeys.Control | ModifierKeys.Alt, Key.Z);
+    }
+}
+
+// Add a View menu entry for the same command
+[ExportMenuItem(
+    OwnerGuid = MenuConstants.APP_MENU_VIEW_GUID,
+    Header = "My Tool Window",
+    InputGestureText = "Ctrl+Alt+Z",
+    Group = MenuConstants.GROUP_APP_MENU_VIEW_WINDOWS,
+    Order = 2000)]
+sealed class ViewMyToolWindow : MenuItemCommand {
+    ViewMyToolWindow() : base(ToolWindowLoader.OpenToolWindow) { }
+}
+
+// The content class
+sealed class MyToolWindowContent : ToolWindowContent {
+    public static readonly Guid THE_GUID = new Guid("18785447-21A8-41DB-B8AD-0F166AEC0D08");
+
+    public override Guid Guid => THE_GUID;
+    public override string Title => "My Extension";
+    public override object? UIObject => myControl;
+    public override IInputElement? FocusedElement => myControl.InputBox;
+    public override FrameworkElement? ZoomElement => myControl;
+
+    readonly MyControl myControl = new MyControl();
+}
+```
+
+### IDsToolWindowService
+
+Import `IDsToolWindowService` to show, hide, or move tool windows programmatically:
+
+```csharp
+// Show a window by GUID
+toolWindowService.Show(MyToolWindowContent.THE_GUID);
+
+// Show with a specific location
+toolWindowService.Show(content, AppToolWindowLocation.Bottom);
+
+// Close a window
+toolWindowService.Close(MyToolWindowContent.THE_GUID);
+
+// Check whether a window is currently visible
+bool visible = toolWindowService.IsShown(MyToolWindowContent.THE_GUID);
+```
+
+---
+
+## Output panes
+
+The Output window hosts named text panes. Import `IOutputService` to create a pane and write text to it.
+
+### IOutputService
+
+```csharp
+public interface IOutputService {
+    IOutputTextPane Create(Guid guid, string name, IContentType? contentType = null);
+    IOutputTextPane Create(Guid guid, string name, string contentType);
+    IOutputTextPane GetTextPane(Guid guid);
+    void Select(Guid guid);
+}
+```
+
+<ParamField path="Create" type="IOutputTextPane">
+  Creates a named output pane identified by `guid`. If a pane with that GUID already exists, the existing instance is returned. The `name` is shown in the pane selector dropdown.
+</ParamField>
+
+<ParamField path="GetTextPane" type="IOutputTextPane">
+  Returns an existing pane by GUID. Throws if the pane has not yet been created.
+</ParamField>
+
+<ParamField path="Select" type="void">
+  Makes the pane with the given GUID the active pane in the Output window.
+</ParamField>
+
+### IOutputTextPane
+
+<ResponseField name="Guid" type="Guid">
+  The GUID this pane was created with.
+</ResponseField>
+
+<ResponseField name="Clear" type="void">
+  Clears all text from the pane.
+</ResponseField>
+
+<ResponseField name="GetText" type="string">
+  Returns all text currently in the pane.
+</ResponseField>
+
+<ResponseField name="CreateWriter" type="ICachedWriter">
+  Creates a buffered writer. Batch up text before flushing to reduce UI updates.
+</ResponseField>
+
+### Writing to an output pane
+
+`IOutputTextPane` extends `IOutputWriter`, which provides `Write` and `WriteLine` methods:
+
+```csharp
+static readonly Guid OutputPaneGuid = new Guid("A1B2C3D4-...");
+
+[ImportingConstructor]
+MyComponent(IOutputService outputService) {
+    var pane = outputService.Create(OutputPaneGuid, "My Extension");
+    pane.WriteLine("Extension loaded successfully.");
+    outputService.Select(OutputPaneGuid);
+}
+```
+
+---
+
+## Theming
+
+dnSpy ships multiple themes and lets users switch between them at runtime. Import `IThemeService` to read the current theme and react to theme changes in your custom UI.
+
+### IThemeService
+
+```csharp
+public interface IThemeService {
+    ITheme Theme { get; }
+    event EventHandler<ThemeChangedEventArgs> ThemeChangedHighPriority;
+    event EventHandler<ThemeChangedEventArgs> ThemeChanged;
+    event EventHandler<ThemeChangedEventArgs> ThemeChangedLowPriority;
+}
+```
+
+<ResponseField name="Theme" type="ITheme">
+  The currently active theme. Use `ThemeChanged` to track when the user switches themes.
+</ResponseField>
+
+<ResponseField name="ThemeChangedHighPriority" type="EventHandler">
+  Raised first when the theme changes. Use this when you need to update resources before the standard `ThemeChanged` subscribers run.
+</ResponseField>
+
+<ResponseField name="ThemeChanged" type="EventHandler">
+  The standard theme-changed event. Subscribe here for most use cases.
+</ResponseField>
+
+<ResponseField name="ThemeChangedLowPriority" type="EventHandler">
+  Raised last, after all standard subscribers have been notified.
+</ResponseField>
+
+### ITheme
+
+```csharp
+public interface ITheme {
+    Guid Guid { get; }
+    string Name { get; }
+    string MenuName { get; }
+    bool IsHighContrast { get; }
+    bool IsDark { get; }
+    bool IsLight { get; }
+    double Order { get; }
+    IThemeColor GetColor(ColorType colorType);
+    IThemeColor GetTextColor(ColorType colorType);
+    IThemeColor GetExplicitColor(ColorType colorType);
+}
+```
+
+<ResponseField name="IsDark" type="bool">
+  `true` for dark themes such as **VS Dark**. Use this to select an alternative icon set or adjust contrast in custom controls.
+</ResponseField>
+
+<ResponseField name="IsLight" type="bool">
+  `true` for light themes such as **VS Light**.
+</ResponseField>
+
+<ResponseField name="IsHighContrast" type="bool">
+  `true` for high-contrast accessibility themes.
+</ResponseField>
+
+<ResponseField name="Name" type="string">
+  Internal theme name. Use `MenuName` for display in a settings UI.
+</ResponseField>
+
+<ResponseField name="Order" type="double">
+  Sort order for displaying themes in a list. Lower values appear first.
+</ResponseField>
+
+<ResponseField name="GetColor" type="IThemeColor">
+  Returns an inherited color for the given `ColorType`, including colors inherited from parent themes.
+</ResponseField>
+
+<ResponseField name="GetTextColor" type="IThemeColor">
+  Returns text editor colors (foreground, background) for the given `ColorType`. Default colors are `null`.
+</ResponseField>
+
+<ResponseField name="GetExplicitColor" type="IThemeColor">
+  Returns only the color explicitly defined in the theme file, without following inheritance.
+</ResponseField>
+
+### Adapting your UI to the active theme
+
+```csharp
+[Export]
+sealed class MyThemedControl {
+    readonly IThemeService themeService;
+
+    [ImportingConstructor]
+    MyThemedControl(IThemeService themeService) {
+        this.themeService = themeService;
+        themeService.ThemeChanged += OnThemeChanged;
+        ApplyTheme(themeService.Theme);
+    }
+
+    void OnThemeChanged(object? sender, ThemeChangedEventArgs e) =>
+        ApplyTheme(themeService.Theme);
+
+    void ApplyTheme(ITheme theme) {
+        if (theme.IsDark) {
+            // Use dark-mode resources
+        } else {
+            // Use light-mode resources
+        }
+    }
+}
+```
+
+<Note>
+  Theme color values are WPF `Brush` or `Color` objects accessible through `IThemeColor.Background` and `IThemeColor.Foreground`. Consult the `ColorType` enum for the full list of available semantic color roles.
+</Note>

@@ -1,0 +1,50 @@
+---
+title: "Edit .NET assemblies without source code using dnSpy"
+description: "Modify metadata, methods, classes, and fields in any .NET assembly using C#, Visual Basic, or raw IL — no original source code required."
+---
+
+The assembly editor is one of dnSpy's core features. It lets you open any .NET or Unity assembly and edit its contents directly — including methods, classes, fields, properties, and low-level metadata tables — without ever needing the original source code. dnSpy uses [Roslyn](https://github.com/dotnet/roslyn) to recompile your edits, so you get full language support including IntelliSense.
+
+## What you can edit
+
+The assembly editor exposes every layer of a .NET assembly for modification:
+
+- **Metadata** — all metadata tables (types, methods, fields, properties, events, custom attributes, and more) are editable through dedicated dialogs or the hex editor
+- **Method bodies** — rewrite any method in C# or Visual Basic, or edit raw CIL opcodes directly in the IL editor
+- **Types** — add new classes, interfaces, enums, and structs, or edit existing ones
+- **Members** — add new methods, fields, properties, and events to any existing type
+
+## Supported languages
+
+When editing methods or classes at the source level, dnSpy supports both C# and Visual Basic. The inline editor includes full IntelliSense — code completion, signature help, and diagnostics — powered by Roslyn. All assembly references for the module you are editing are automatically available to the compiler, so you can call any type or method already in the assembly or its dependencies.
+
+<Note>
+  Visual Basic editing requires `Microsoft.VisualBasic.dll` to be present. dnSpy resolves this automatically for most assemblies.
+</Note>
+
+## The Assembly Explorer
+
+The **Assembly Explorer** panel on the left side of the dnSpy window is a treeview that lets you browse the full structure of every loaded assembly. Expand any assembly node to see its modules, namespaces, types, methods, fields, properties, and events. Right-clicking any node reveals context menu commands for editing, adding, or deleting that element.
+
+<Tip>
+  Double-clicking a method in the Assembly Explorer opens its decompiled source in the main code view, where you can also right-click to edit inline.
+</Tip>
+
+## Export to project
+
+If you want to work on a full assembly outside dnSpy, use **File > Export to Project**. This decompiles the entire assembly to a Visual Studio–compatible project with individual `.cs` or `.vb` files for every type. You can then recompile the project independently and reload the output in dnSpy.
+
+## No source code required
+
+All editing operations — from method rewrites to metadata tweaks — work directly on the binary. When you edit a method in C# or Visual Basic, dnSpy compiles your changes with Roslyn and patches the resulting IL back into the assembly in memory. You can then save the modified assembly to disk at any time.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Edit methods and classes" icon="code" href="/assembly-editor/editing-methods">
+    Rewrite any method or class in C# or Visual Basic with full IntelliSense support.
+  </Card>
+  <Card title="IL editor" icon="microchip" href="/assembly-editor/il-editor">
+    Edit raw CIL opcodes directly for low-level control over method bodies.
+  </Card>
+</CardGroup>

@@ -1,28 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "dnSpy",
+  "projectType": "general",
+  "projectName": "dnSpy",
+  "projectDescription": "A powerful .NET debugger and assembly editor that lets you debug, decompile, and edit .NET and Unity assemblies without source code.",
   "theme": "aspen",
-  "colors": {
-    "primary": "#24343c",
-    "light": "#8c9494",
-    "dark": "#cfd2d3"
-  },
-  "favicon": "https://media.brand.dev/a279ebb6-248a-4232-ac8c-d0878aff6f29.jpg",
-  "logo": {
-    "light": "https://media.brand.dev/5a0477a4-8007-40aa-83a3-0c5368df0f39.svg",
-    "dark": "https://media.brand.dev/5a0477a4-8007-40aa-83a3-0c5368df0f39.svg"
-  },
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/dnspy/dnspy"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/dnspy/dnspy"
-    }
-  },
+  "primaryColor": "#24343c",
+  "lightColor": "#8c9494",
+  "darkColor": "#cfd2d3",
   "navigation": {
     "tabs": [
       {
@@ -93,5 +76,33 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "Debug .NET Framework, .NET Core, and Unity game assemblies without source code",
+    "Edit .NET assemblies: methods, classes, and metadata in C# or Visual Basic",
+    "IL editor for low-level method body editing",
+    "Hex editor with .NET metadata and PE structure highlighting",
+    "C# Interactive scripting window for automating dnSpy",
+    "Search assemblies for classes, methods, strings, and more",
+    "Analyzer to find callers, type usage, and member references",
+    "Conditional breakpoints, tracepoints, and expression evaluation",
+    "Export/import breakpoints and decompile to project",
+    "Plugin/extension API with MEF-based composition",
+    "Light, dark, and high-contrast themes",
+    "BAML decompiler for WPF resource inspection"
+  ],
+  "publicApiSurface": [
+    "IExtension (dnSpy.Contracts.Extension)",
+    "ExportExtensionAttribute",
+    "DbgManager (debugger lifecycle management)",
+    "DbgProcess, DbgThread, DbgModule, DbgRuntime",
+    "DbgCodeBreakpoint, DbgCodeBreakpointsService",
+    "DbgExpressionEvaluator, DbgLanguage, DbgValue",
+    "IDsDocumentService (assembly document management)",
+    "IDsDocument, IDsDotNetDocument, IDsPEDocument",
+    "IThemeService, ITheme (theming API)",
+    "IDocumentSearcher, IDocumentSearcherProvider",
+    "HexBufferFactoryService, HexBuffer (hex editor API)",
+    "IAutoLoaded (MEF auto-loaded extensions)"
+  ]
 }

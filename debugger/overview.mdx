@@ -1,0 +1,117 @@
+---
+title: "Debug .NET and Unity assemblies without source code"
+description: "Start and control debug sessions for .NET Framework, .NET, and Unity. Step through code, inspect the Output window, and handle in-memory modules."
+---
+
+dnSpy lets you debug .NET Framework, .NET, and Unity assemblies without any source code. You can launch a process directly from dnSpy, attach to one that is already running, set breakpoints, step through decompiled code, and inspect the full runtime state — all from a single window.
+
+## Supported runtimes
+
+dnSpy supports debugging the following runtimes:
+
+- **.NET Framework** (all versions)
+- **.NET** (formerly .NET Core)
+- **Unity** game assemblies (requires the [dnSpy-Unity-mono](https://github.com/dnSpy/dnSpy-Unity-mono) binaries)
+
+<Note>
+  To debug Unity games, place the Unity mono binaries in the same directory as dnSpy or download the prebuilt Unity release from the releases page.
+</Note>
+
+## Starting a debug session
+
+<Tabs>
+  <Tab title="Launch a new process">
+    <Steps>
+      <Step title="Open the Debug menu">
+        Click **Debug** in the menu bar and select **Start Debugging**, or press **F5**.
+      </Step>
+      <Step title="Configure the launch options">
+        In the dialog that opens, browse to the executable you want to debug, set any command-line arguments, and choose the working directory.
+      </Step>
+      <Step title="Start debugging">
+        Click **OK**. dnSpy launches the process and breaks at the entry point if you have that option enabled.
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="Attach to a running process">
+    <Steps>
+      <Step title="Open Attach to Process">
+        Click **Debug** > **Attach to Process**, or press **Ctrl+Alt+P**.
+      </Step>
+      <Step title="Select the process">
+        Choose the process you want to attach to from the list. You can filter by name or PID.
+      </Step>
+      <Step title="Attach">
+        Click **Attach**. dnSpy connects to the running process without restarting it.
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Stepping through code
+
+Once a process is paused, use these keyboard shortcuts to navigate execution:
+
+| Action | Shortcut |
+|---|---|
+| Step over | **F10** |
+| Step into | **F11** |
+| Step out | **Shift+F11** |
+| Continue | **F5** |
+| Stop debugging | **Shift+F5** |
+
+<Tip>
+  When you step into a method, dnSpy decompiles it on demand so you always see readable C# or Visual Basic code, even for system assemblies.
+</Tip>
+
+## Break on module load
+
+You can pause execution the moment a specific module is loaded into the process:
+
+<Steps>
+  <Step title="Open Debug > Settings">
+    Navigate to **Debug** > **Windows** > **Modules** to open the Modules window.
+  </Step>
+  <Step title="Right-click a module">
+    Right-click any module row and choose **Break on module load** to toggle the option for future loads.
+  </Step>
+</Steps>
+
+This is useful when a target assembly is loaded dynamically and you want to break before any of its code executes.
+
+## Output window
+
+The **Output** window logs every debugging event — process creation, module loads, thread creation, exceptions, and program output. Timestamps are shown by default so you can see exactly when each event occurred.
+
+To open it, go to **Debug** > **Windows** > **Output**.
+
+<Note>
+  GUI application console output can be redirected to the Output window by enabling **Redirect GUI console output** in debugger settings.
+</Note>
+
+## Assemblies that decrypt themselves at runtime
+
+Some obfuscated assemblies decrypt or rewrite themselves in memory after they are loaded from disk. dnSpy can use the in-memory image of a module instead of the original file, so you see and debug the actual live code.
+
+To always use in-memory images, enable **Use memory modules** (`UseMemoryModules`) in **Debug** > **Options**. dnSpy will then read module data from process memory rather than from disk files.
+
+<Warning>
+  In-memory images may differ significantly from the on-disk file. If you save such an image, the saved file reflects the decrypted in-memory state.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Breakpoints" icon="circle-dot" href="/debugger/breakpoints">
+    Set conditional breakpoints, tracepoints, and hit count filters. Export and import breakpoint sets.
+  </Card>
+  <Card title="Variables and evaluation" icon="brackets-curly" href="/debugger/variables-and-evaluation">
+    Inspect locals, add watch expressions, evaluate C# and Visual Basic, and save variable data to disk.
+  </Card>
+  <Card title="Multiple processes" icon="layer-group" href="/debugger/multi-process">
+    Debug several processes simultaneously and manage them with the Processes and Threads windows.
+  </Card>
+  <Card title="Debugger API" icon="code" href="/extensions/api/debugger-api">
+    Control the debugger programmatically from an extension or the C# Interactive window.
+  </Card>
+</CardGroup>

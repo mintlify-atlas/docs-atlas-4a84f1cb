@@ -1,0 +1,124 @@
+---
+title: "Customize the dnSpy UI appearance with built-in themes"
+description: "Switch between dnSpy's built-in Blue, Light, Dark, and Dark High Contrast themes, and learn the ITheme API for extension developers."
+---
+
+dnSpy ships with four built-in themes that control every colour in the UI — editor backgrounds, syntax highlighting, the assembly tree, the hex editor, and all tool windows. You can switch themes instantly without restarting, and extensions can react to theme changes through the `IThemeService` API.
+
+## Switching themes
+
+Click **View > Themes** and select one of the built-in options. The UI updates immediately.
+
+<Note>
+  Your theme choice is persisted across sessions. dnSpy restores the last-used theme on startup.
+</Note>
+
+## Built-in themes
+
+<CardGroup cols={2}>
+  <Card title="Blue" icon="circle" iconType="solid">
+    A classic Visual Studio-style theme with a blue toolbar and light editor background. Good for daylight use in familiar environments.
+  </Card>
+  <Card title="Light" icon="sun">
+    A clean white theme with neutral chrome. Maximises contrast in bright environments.
+  </Card>
+  <Card title="Dark" icon="moon">
+    A dark background theme that reduces eye strain during long sessions. `ITheme.IsDark` returns `true` for this theme.
+  </Card>
+  <Card title="Dark High Contrast" icon="adjust">
+    A dark theme optimised for accessibility. `ITheme.IsHighContrast` returns `true`, which signals extensions and the editor to maximise contrast ratios.
+  </Card>
+</CardGroup>
+
+## What themes control
+
+Themes define colours for every element through the `ColorType` enum (in `dnSpy.Contracts.Themes`). A few examples of the categories covered:
+
+<Tabs>
+  <Tab title="Syntax highlighting">
+    Keywords, strings, comments, operators, numbers, labels, IL opcodes, and XML/XAML tokens all have dedicated colour entries.
+
+    ```csharp
+    // A subset of ColorType entries
+    ColorType.Keyword
+    ColorType.String
+    ColorType.Comment
+    ColorType.Number
+    ColorType.OpCode       // IL opcodes in the IL editor
+    ColorType.ILDirective  // IL directives (.maxstack, .locals)
+    ```
+  </Tab>
+  <Tab title="UI chrome">
+    Window backgrounds, selection colours, tool window borders, and tree view item colours are defined per theme so the entire application feels cohesive.
+  </Tab>
+  <Tab title="Type colours">
+    Type-level syntax tokens such as `StaticType`, `SealedType`, `Interface`, `Enum`, `Delegate`, `ValueType`, and generic parameters each have separate colour definitions so the decompiler output is easy to scan.
+
+    ```csharp
+    ColorType.Type
+    ColorType.SealedType
+    ColorType.StaticType
+    ColorType.Delegate
+    ColorType.Enum
+    ColorType.Interface
+    ColorType.ValueType
+    ```
+  </Tab>
+</Tabs>
+
+## Background image support
+
+You can set a background image in **View > Options > Environment**. The image is composited behind the editor and respects the current theme's transparency settings.
+
+## ITheme API (for extension developers)
+
+The `ITheme` interface (in `dnSpy.Contracts.Themes`) exposes theme metadata and colour lookup methods:
+
+```csharp
+public interface ITheme {
+    Guid   Guid          { get; }
+    string Name          { get; }
+    string MenuName      { get; }
+    bool   IsHighContrast { get; }
+    bool   IsDark        { get; }
+    bool   IsLight       { get; }
+    double Order         { get; }
+
+    // Look up a colour, following inheritance
+    IThemeColor GetColor(ColorType colorType);
+
+    // Look up a colour suitable for a text editor (nulls for unset values)
+    IThemeColor GetTextColor(ColorType colorType);
+
+    // Look up only colours explicitly defined in the theme file
+    IThemeColor GetExplicitColor(ColorType colorType);
+}
+```
+
+Use `IsDark` and `IsHighContrast` to adapt your extension's UI to the active theme without hard-coding colours.
+
+## IThemeService API (for extension developers)
+
+`IThemeService` (in `dnSpy.Contracts.Themes`) lets you read the active theme and subscribe to change notifications. Import it via MEF:
+
+```csharp
+[Import]
+IThemeService themeService = null!;
+
+void OnThemeChanged(object sender, ThemeChangedEventArgs e) {
+    var theme = themeService.Theme;
+    var bg = theme.GetColor(ColorType.DefaultBackground);
+    // Update your extension's UI accordingly
+}
+```
+
+The service raises three events in order — `ThemeChangedHighPriority`, `ThemeChanged`, and `ThemeChangedLowPriority` — so extensions with dependencies can coordinate update order.
+
+<Tip>
+  Subscribe to `ThemeChangedHighPriority` if your extension updates a shared resource that other components depend on. Use `ThemeChangedLowPriority` if your extension only needs to repaint its own UI after everything else has settled.
+</Tip>
+
+## Related pages
+
+- [Extension overview](/extensions/overview) — build extensions that integrate with the theme system
+- [UI components API](/extensions/api/ui-components) — use theme-aware UI building blocks

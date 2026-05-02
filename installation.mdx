@@ -1,0 +1,99 @@
+---
+title: "How to Download and Install dnSpy on Your Windows PC"
+description: "Download prebuilt dnSpy binaries from GitHub Releases or build from source on Windows. Covers system requirements and Unity game debugging setup."
+---
+
+dnSpy runs on Windows and targets .NET Framework and .NET applications. You can get dnSpy either by downloading the prebuilt release binaries from GitHub or by building the project yourself from source. This page covers both paths.
+
+## System requirements
+
+- **Operating system:** Windows (dnSpy is a WPF application and requires Windows)
+- **Runtime:** .NET Framework 4.8 is bundled with Windows 10 and later; no separate install is needed for the `.NET Framework` release
+- **Unity debugging:** Requires a patched Mono runtime — see the Unity section below
+
+<Tabs>
+  <Tab title="Download binaries">
+    <Steps>
+      <Step title="Go to the releases page">
+        Open [https://github.com/dnSpy/dnSpy/releases](https://github.com/dnSpy/dnSpy/releases) in your browser and find the latest release.
+      </Step>
+      <Step title="Choose a release asset">
+        Download the asset that matches your target runtime:
+
+        | Asset | Use when |
+        |-------|----------|
+        | `dnSpy-net-win64.zip` | Debugging .NET (net5+) assemblies on 64-bit Windows |
+        | `dnSpy-net-win32.zip` | Debugging .NET (net5+) assemblies on 32-bit Windows |
+        | `dnSpy-netframework.zip` | Debugging .NET Framework assemblies |
+        | `dnSpy-Unity-*.zip` | Debugging Unity games (see Unity section below) |
+      </Step>
+      <Step title="Extract and run">
+        Extract the `.zip` archive to any folder you choose. No installer is required — run `dnSpy.exe` (or `dnSpy-x86.exe` for the 32-bit .NET Framework build) directly from the extracted folder.
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="Build from source">
+    <Steps>
+      <Step title="Install prerequisites">
+        Make sure you have the following installed before cloning:
+
+        - [Git for Windows](https://git-scm.com/download/win)
+        - [.NET SDK](https://dotnet.microsoft.com/download) (version compatible with `net5.0-windows` or later)
+        - **Optional:** Visual Studio with MSBuild (required only if you skip the `-NoMsbuild` flag)
+      </Step>
+      <Step title="Clone the repository">
+        Clone recursively to include all submodules:
+
+        ```powershell
+        git clone --recursive https://github.com/dnSpy/dnSpy.git
+        cd dnSpy
+        ```
+      </Step>
+      <Step title="Run the build script">
+        Use `build.ps1` to compile all targets. The `-NoMsbuild` flag tells the script to use `dotnet` instead of `msbuild`:
+
+        ```powershell
+        ./build.ps1 -NoMsbuild
+        ```
+
+        To build only a specific target framework, pass the `-buildtfm` parameter:
+
+        ```powershell
+        # Build only the .NET Framework target
+        ./build.ps1 -NoMsbuild -buildtfm netframework
+
+        # Build only the .NET x64 target
+        ./build.ps1 -NoMsbuild -buildtfm net-x64
+
+        # Build only the .NET x86 target
+        ./build.ps1 -NoMsbuild -buildtfm net-x86
+        ```
+
+        Output binaries are written to `dnSpy\dnSpy\bin\Release\`.
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Unity debugging setup
+
+To debug Unity games you need a patched version of the Mono runtime that Unity embeds. Without this patch, the debugger cannot attach to a Unity process.
+
+<Steps>
+  <Step title="Get the patched Mono runtime">
+    You have two options:
+
+    - **Prebuilt binaries:** Download the Unity release package from [https://github.com/dnSpy/dnSpy/releases/unity](https://github.com/dnSpy/dnSpy/releases/unity). These archives include the patched `mono.dll` for common Unity versions.
+    - **Build from source:** Clone and build [https://github.com/dnSpy/dnSpy-Unity-mono](https://github.com/dnSpy/dnSpy-Unity-mono) following its own build instructions.
+  </Step>
+  <Step title="Replace the Mono runtime in your Unity game">
+    Locate the `mono.dll` (or `mono-2.0-bdwgc.dll`) file inside the Unity game's `<GameName>_Data\Mono\` or `MonoBleedingEdge\` folder and replace it with the patched version that matches your Unity version.
+
+    <Warning>
+      Back up the original `mono.dll` before replacing it. Using an incorrect patched version may prevent the game from launching.
+    </Warning>
+  </Step>
+  <Step title="Attach dnSpy to the Unity process">
+    Launch the game, then in dnSpy go to **Debug > Attach to Process** and select the Unity game process. See [Debugger overview](/debugger/overview) for details on attaching and setting breakpoints.
+  </Step>
+</Steps>

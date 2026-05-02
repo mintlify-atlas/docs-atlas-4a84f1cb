@@ -1,0 +1,342 @@
+---
+title: "Document service API for loading and managing assemblies"
+description: "Reference for IDsDocumentService, IDsDocument, and related types for loading, querying, and reacting to assembly changes in dnSpy extensions."
+---
+
+The document API is the foundation for working with assemblies and PE files in dnSpy extensions. You import `IDsDocumentService` to load files, query what is currently open, and subscribe to add/remove events — all without touching the UI layer directly.
+
+<CardGroup cols={2}>
+  <Card title="IDsDocumentService" icon="folder-open" href="/extensions/api/documents#idsdocumentservice">
+    Central service for loading and managing all open documents.
+  </Card>
+  <Card title="IDsDocument" icon="file" href="/extensions/api/documents#idsdocument">
+    Base interface every document type implements.
+  </Card>
+  <Card title="IDsDotNetDocument" icon="code" href="/extensions/api/documents#idsdotnetdocument">
+    Extends IDsDocument for .NET assemblies with dnlib access.
+  </Card>
+  <Card title="IDsPEDocument" icon="microchip" href="/extensions/api/documents#idspedocument">
+    Extends IDsDocument for native PE files.
+  </Card>
+</CardGroup>
+
+## IDsDocumentService
+
+`IDsDocumentService` is the central service that manages every document open in the treeview. Import it via MEF to load, search, and track assemblies.
+
+```csharp
+[Export]
+sealed class MyComponent {
+    readonly IDsDocumentService documentService;
+
+    [ImportingConstructor]
+    MyComponent(IDsDocumentService documentService) =>
+        this.documentService = documentService;
+}
+```
+
+### Methods
+
+<ParamField path="GetDocuments" type="IDsDocument[]">
+  Returns all top-level documents currently open. Does not include child documents such as the individual modules inside a multi-module assembly.
+</ParamField>
+
+<ParamField path="GetOrAdd" type="IDsDocument">
+  Adds a document to the list if it has not been added yet. If an equivalent document (matched by key) already exists, the existing instance is returned instead.
+</ParamField>
+
+<ParamField path="ForceAdd" type="IDsDocument">
+  Adds a document even when a document with the same key already exists. Use this when you intentionally want duplicates — for example, loading two versions of the same assembly side by side.
+
+  <Expandable title="parameters">
+    <ParamField path="document" type="IDsDocument" required>
+      The document to add.
+    </ParamField>
+    <ParamField path="delayLoad" type="bool" required>
+      When `true`, the document is shown in the treeview before its children are loaded.
+    </ParamField>
+    <ParamField path="data" type="object">
+      Optional data forwarded to `CollectionChanged` listeners.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="TryGetOrCreate" type="IDsDocument?">
+  Creates a document from a `DsDocumentInfo` descriptor and adds it to the list, or returns the existing document if one already matches the key. Returns `null` if the document cannot be created (for example, the file does not exist).
+
+  <Expandable title="parameters">
+    <ParamField path="info" type="DsDocumentInfo" required>
+      Descriptor that identifies the file or in-memory data to load.
+    </ParamField>
+    <ParamField path="isAutoLoaded" type="bool" default="false">
+      When `true`, marks the document as auto-loaded rather than user-initiated.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="TryCreateOnly" type="IDsDocument?">
+  Creates a document without adding it to the open list. Useful for inspecting a file before deciding whether to open it.
+</ParamField>
+
+<ParamField path="Resolve" type="IDsDocument?">
+  Resolves an assembly reference to a document that is already open. Returns `null` if the assembly is not loaded.
+</ParamField>
+
+<ParamField path="FindAssembly" type="IDsDocument?">
+  Searches the open document list for an assembly by `IAssembly` identity. An overload accepts `FindAssemblyOptions` flags to control which identity fields are compared.
+</ParamField>
+
+<ParamField path="Find" type="IDsDocument?">
+  Looks up an open document by its `IDsDocumentNameKey`. Returns `null` if not found.
+</ParamField>
+
+<ParamField path="Remove" type="void">
+  Removes a document by key or removes a collection of documents at once. Triggers `CollectionChanged` with a `Remove` event.
+</ParamField>
+
+<ParamField path="Clear" type="void">
+  Closes all open documents and fires a `Clear` event on `CollectionChanged`.
+</ParamField>
+
+<ParamField path="CreateDocument" type="IDsDocument">
+  Creates a document from a file path on disk or from a `byte[]` in memory without adding it to the open list. Use `TryGetOrCreate` or `ForceAdd` when you also want it visible in the treeview.
+</ParamField>
+
+<ParamField path="DisableAssemblyLoad" type="IDisposable">
+  Temporarily prevents auto-loading of assemblies. Call `Dispose()` on the returned object to re-enable loading.
+</ParamField>
+
+### Events and properties
+
+<ResponseField name="CollectionChanged" type="EventHandler<NotifyDocumentCollectionChangedEventArgs>">
+  Raised on the dispatcher thread (or any thread if `SetDispatcher` was not called) whenever documents are added, removed, or cleared.
+</ResponseField>
+
+<ResponseField name="AssemblyResolver" type="IAssemblyResolver">
+  The dnlib assembly resolver used when resolving references between loaded modules.
+</ResponseField>
+
+### Reacting to collection changes
+
+Subscribe to `CollectionChanged` to be notified whenever an assembly is opened or closed:
+
+```csharp
+[ImportingConstructor]
+MyComponent(IDsDocumentService documentService) {
+    documentService.CollectionChanged += OnCollectionChanged;
+}
+
+void OnCollectionChanged(object? sender, NotifyDocumentCollectionChangedEventArgs e) {
+    switch (e.Type) {
+        case NotifyDocumentCollectionType.Add:
+            // e.Documents[0] is the newly opened document
+            break;
+        case NotifyDocumentCollectionType.Remove:
+            // e.Documents contains all removed documents
+            break;
+        case NotifyDocumentCollectionType.Clear:
+            // e.Documents contains all documents that were cleared
+            break;
+    }
+}
+```
+
+---
+
+## IDsDocument
+
+`IDsDocument` is the base interface that every document type implements — .NET assemblies, PE files, and custom document types all derive from it. It also extends `IAnnotations`, which lets you attach arbitrary key/value data to any document instance.
+
+```csharp
+public interface IDsDocument : IAnnotations {
+    DsDocumentInfo? SerializedDocument { get; }
+    IDsDocumentNameKey Key { get; }
+    AssemblyDef? AssemblyDef { get; }
+    ModuleDef? ModuleDef { get; }
+    IPEImage? PEImage { get; }
+    string Filename { get; set; }
+    bool IsAutoLoaded { get; set; }
+    TList<IDsDocument> Children { get; }
+    bool ChildrenLoaded { get; }
+}
+```
+
+### Properties
+
+<ResponseField name="SerializedDocument" type="DsDocumentInfo?">
+  A serializable descriptor that dnSpy uses to reopen the document on the next launch. `null` when the document cannot be persisted (for example, in-memory-only documents).
+</ResponseField>
+
+<ResponseField name="Key" type="IDsDocumentNameKey">
+  A key used to detect duplicates when adding a new document. The most common implementation is `FilenameKey`, which compares file paths case-insensitively.
+</ResponseField>
+
+<ResponseField name="AssemblyDef" type="AssemblyDef?">
+  The dnlib `AssemblyDef` for this document. `null` if the document is not a .NET file or is a netmodule rather than an assembly.
+</ResponseField>
+
+<ResponseField name="ModuleDef" type="ModuleDef?">
+  The dnlib `ModuleDef`. `null` if the document is not a .NET file. Use this to walk types, methods, and metadata.
+</ResponseField>
+
+<ResponseField name="PEImage" type="IPEImage?">
+  The raw PE image. Available for both .NET and native PE documents. `null` for purely in-memory documents.
+</ResponseField>
+
+<ResponseField name="Filename" type="string">
+  The absolute path on disk, or an empty string for in-memory documents.
+</ResponseField>
+
+<ResponseField name="IsAutoLoaded" type="bool">
+  `true` when dnSpy loaded the document automatically (for example, as a dependency) rather than in response to a direct user action.
+</ResponseField>
+
+<ResponseField name="Children" type="TList<IDsDocument>">
+  Child documents. For a multi-module .NET assembly the children are the individual netmodules.
+</ResponseField>
+
+### Extension methods
+
+The `DsDocumentExtensionMethods` class adds several helpers directly to `IDsDocument`:
+
+| Method | Description |
+|--------|-------------|
+| `GetShortName()` | Returns the filename without extension, falling back to the module name. |
+| `GetAllChildrenAndSelf()` | Enumerates the document and all its loaded descendants. |
+| `GetAllChildren()` | Enumerates only the loaded descendants. |
+| `GetModules<T>()` | Collects all `ModuleDef` instances from the document and its children. |
+
+---
+
+## IDsDotNetDocument
+
+`IDsDotNetDocument` marks a document as a .NET assembly. It extends `IDsDocument` without adding new members; the presence of this interface signals to dnSpy and to extensions that `ModuleDef` and `AssemblyDef` are available.
+
+```csharp
+public interface IDsDotNetDocument : IDsDocument {
+}
+```
+
+Check for this interface when you need to distinguish a .NET assembly from a native PE file:
+
+```csharp
+foreach (var doc in documentService.GetDocuments()) {
+    if (doc is IDsDotNetDocument dotNetDoc && dotNetDoc.ModuleDef is { } module) {
+        // Work with module.Types, module.Assembly, etc.
+    }
+}
+```
+
+<Tip>
+  Cast to `IDsDotNetDocument` rather than checking `ModuleDef != null` directly. The interface cast is the canonical way other dnSpy components distinguish document types.
+</Tip>
+
+---
+
+## IDsPEDocument
+
+`IDsPEDocument` marks a document as a native PE file — one that is **not** a .NET assembly. Like `IDsDotNetDocument`, it extends `IDsDocument` without new members.
+
+```csharp
+public interface IDsPEDocument : IDsDocument {
+}
+```
+
+For native PE files, use `PEImage` to access the raw PE structure:
+
+```csharp
+if (doc is IDsPEDocument peDoc && peDoc.PEImage is { } image) {
+    // Access image.ImageSectionHeaders, etc.
+}
+```
+
+<Note>
+  A document that is both a PE file and a .NET assembly implements `IDsDotNetDocument`, not `IDsPEDocument`. Use `IDsPEDocument` only for pure native binaries.
+</Note>
+
+---
+
+## DsDocumentInfo
+
+`DsDocumentInfo` is a lightweight, immutable struct that describes how to locate or construct a document. You pass it to `TryGetOrCreate` or `TryCreateOnly` when opening files programmatically.
+
+```csharp
+public readonly struct DsDocumentInfo {
+    public string Name { get; }
+    public object? Data { get; }
+    public Guid Type { get; }
+}
+```
+
+### Properties
+
+<ResponseField name="Name" type="string">
+  For file-based documents this is the absolute path. For GAC documents this is the assembly full name. Never `null`; defaults to an empty string.
+</ResponseField>
+
+<ResponseField name="Type" type="Guid">
+  Identifies the document type. Use the predefined constants on `DocumentConstants` — for example, `DocumentConstants.DOCUMENTTYPE_FILE` for files on disk.
+</ResponseField>
+
+<ResponseField name="Data" type="object?">
+  Optional extra data. For in-memory documents this is a `Func<(byte[]? filedata, bool isFileLayout)>` delegate that produces the raw bytes.
+</ResponseField>
+
+### Factory methods
+
+Use the static factory methods rather than calling the constructor directly:
+
+```csharp
+// Open a file from disk
+var info = DsDocumentInfo.CreateDocument(@"C:\app\MyAssembly.dll");
+
+// Open from the GAC by full assembly name
+var gacInfo = DsDocumentInfo.CreateGacDocument("mscorlib, Version=4.0.0.0, ...");
+
+// Open bytes that are already in memory
+var memInfo = DsDocumentInfo.CreateInMemory(
+    () => (File.ReadAllBytes(path), isFileLayout: true),
+    filename: "MyAssembly.dll");
+
+var doc = documentService.TryGetOrCreate(info);
+```
+
+---
+
+## NotifyDocumentCollectionChangedEventArgs
+
+This event args class is delivered to every `CollectionChanged` subscriber when the document list changes.
+
+```csharp
+public sealed class NotifyDocumentCollectionChangedEventArgs : EventArgs {
+    public NotifyDocumentCollectionType Type { get; }
+    public IDsDocument[] Documents { get; }
+    public object? Data { get; }
+}
+```
+
+### Properties
+
+<ResponseField name="Type" type="NotifyDocumentCollectionType">
+  The kind of change that occurred.
+
+  <Expandable title="values">
+    <ResponseField name="Add" type="enum value">
+      A single document was added. `Documents` contains that one document.
+    </ResponseField>
+    <ResponseField name="Remove" type="enum value">
+      One or more documents were removed. `Documents` contains all removed documents.
+    </ResponseField>
+    <ResponseField name="Clear" type="enum value">
+      All documents were removed at once. `Documents` contains every document that was cleared.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="Documents" type="IDsDocument[]">
+  The documents affected by the event. Never `null`; may be an empty array for no-op clears.
+</ResponseField>
+
+<ResponseField name="Data" type="object?">
+  The caller-supplied data object passed to `ForceAdd`, `Remove`, or `Clear`. Useful for passing context between the code that triggers the change and the listeners that react to it.
+</ResponseField>

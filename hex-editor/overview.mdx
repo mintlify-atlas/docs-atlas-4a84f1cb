@@ -1,0 +1,79 @@
+---
+title: "Hex editor for .NET metadata and PE files in dnSpy"
+description: "Inspect raw bytes with .NET metadata and PE structure highlighting, hover tooltips, and two-way navigation between the hex editor and decompiled code."
+---
+
+The dnSpy hex editor lets you inspect and edit binary data at the byte level while staying aware of the higher-level structures that make up a .NET assembly. Rather than showing you an undifferentiated stream of bytes, it highlights .NET metadata structures and PE structures directly in the view, so you can immediately see which field you are looking at without consulting an external reference.
+
+<CardGroup cols={2}>
+  <Card title="Structure highlighting" icon="highlighter">
+    .NET metadata structures and PE structures are highlighted in the values column so you can see field boundaries at a glance.
+  </Card>
+  <Card title="Hover tooltips" icon="message-circle">
+    Hovering over a .NET metadata or PE field shows a tooltip with the field name and type, saving you from cross-referencing the spec manually.
+  </Card>
+  <Card title="Two-way code navigation" icon="arrows-left-right">
+    Click an address in decompiled code to jump to its IL in the hex editor. Press **F12** inside an IL body to jump back to the decompiled code.
+  </Card>
+  <Card title="Memory window" icon="memory">
+    During a debug session you can view and save variables — such as decrypted byte arrays — directly in the hex editor through the memory window.
+  </Card>
+</CardGroup>
+
+## Columns
+
+Each line in the hex editor is made up of three columns. You can toggle any of them on or off through the view options.
+
+| Column | Description |
+|--------|-------------|
+| **Offset** | The position of the first byte on the line. You can display offsets as plain hex digits, with a `0x` prefix (C# style), with a `&H` prefix (Visual Basic style), or with an `h` suffix (assembly style). |
+| **Values** | The raw bytes on the line rendered in the configured display format. |
+| **ASCII** | A text representation of each byte using the configured encoding. Non-printable bytes are shown as a dot. |
+
+## Display formats
+
+The **Values** column can render bytes as several different numeric types. Right-click the values column header or open the hex editor settings to change the format.
+
+| Format | Description |
+|--------|-------------|
+| Hex bytes | One byte per cell, displayed as two hex digits (default). |
+| Hex 16-bit | Groups of two bytes displayed as a 16-bit unsigned hex value. |
+| Hex 32-bit | Groups of four bytes displayed as a 32-bit unsigned hex value. |
+| Hex 64-bit | Groups of eight bytes displayed as a 64-bit unsigned hex value. |
+| Decimal | Any of the above sizes rendered in decimal instead of hex. |
+| Float / Double | Groups of four or eight bytes interpreted as IEEE 754 floating-point. |
+| Binary | Each byte shown as 8 bits. |
+| Big-endian variants | All multi-byte formats are also available in big-endian byte order. |
+
+<Note>
+Signed variants (sbyte, int16, int32, int64) are also available for all integer sizes in both hex and decimal.
+</Note>
+
+## Two-way navigation with decompiled code
+
+One of the most useful features of the hex editor is its tight integration with the decompiler view.
+
+<Steps>
+  <Step title="Go from decompiled code to hex">
+    In the decompiler window, click on an address or an IL instruction. dnSpy jumps to the corresponding bytes in the hex editor and highlights the relevant range.
+  </Step>
+  <Step title="Go from hex to decompiled code">
+    Place the cursor inside an IL method body in the hex editor and press **F12**. dnSpy opens the decompiled code view for that method at the matching line. This is particularly useful when you want to understand what source-level statement a patch has changed.
+  </Step>
+</Steps>
+
+<Tip>
+Use **Ctrl+F12** to follow a reference from the current cursor position in the hex editor. This works for metadata tokens, heap offsets, and other structured references embedded in the binary.
+</Tip>
+
+## Memory window
+
+When you are debugging, the memory window gives you a hex editor view backed by the live process memory rather than a disk file.
+
+- View the raw bytes of any variable by right-clicking it in the **Locals**, **Watch**, or **Autos** window and choosing **Show in Memory Window**.
+- Decrypted byte arrays and other runtime values can be saved to disk directly from the memory window.
+- Because the underlying buffer reads from process memory, the view can change as the program runs. dnSpy refreshes the display automatically.
+
+<Note>
+The memory window is only available while a debug session is active.
+</Note>

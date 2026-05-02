@@ -1,0 +1,145 @@
+---
+title: "Automate dnSpy with the C# Interactive scripting window"
+description: "Use the C# Interactive window to script dnSpy with Roslyn-powered C#, access internal services, automate the debugger, and build reusable tooling."
+---
+
+The C# Interactive window is a full Roslyn-based REPL built into dnSpy. You can type C# expressions and statements directly, call dnSpy's internal APIs, manipulate loaded assemblies, and control the debugger — all without writing a separate extension.
+
+## Opening the C# Interactive window
+
+Click **View > C# Interactive** to open the scripting window. The window shows a prompt where you can type C# code and press **Enter** to execute it.
+
+<Note>
+  The scripting window runs on .NET and uses the same Roslyn compiler that powers the Assembly Editor. Full C# language features are available, including LINQ, async/await, and generics.
+</Note>
+
+## The script globals
+
+Every script runs inside an instance of `IScriptGlobals` (defined in `dnSpy.Contracts.Scripting.Roslyn`). This object is available implicitly — you call its methods directly without any qualifier.
+
+The most important members are:
+
+```csharp
+// Print text to the REPL output
+void Print(string? text);
+void PrintLine(string? text = null);
+void PrintError(string? text);
+
+// Resolve any dnSpy service by interface type
+T Resolve<T>() where T : class;
+T? TryResolve<T>() where T : class;
+
+// Run code on the UI thread
+void UI(Action action);
+T UI<T>(Func<T> func);
+
+// Show a message box
+MsgBoxButton Show(string message, MsgBoxButton buttons = MsgBoxButton.OK);
+
+// Cancellation token — signalled when the script resets
+CancellationToken Token { get; }
+```
+
+## Resolving services with IServiceLocator
+
+`IServiceLocator` (in `dnSpy.Contracts.Scripting`) provides the same `Resolve<T>()` / `TryResolve<T>()` pattern for locating MEF-exported services. The globals object itself implements this interface, so you can call `Resolve<T>()` directly at the REPL prompt.
+
+```csharp
+// IServiceLocator interface
+public interface IServiceLocator {
+    T Resolve<T>() where T : class;
+    T? TryResolve<T>() where T : class;
+}
+```
+
+## Writing output with IOutputWriter
+
+`IOutputWriter` (in `dnSpy.Contracts.Scripting`) provides low-level, colour-aware text output. The globals expose the same methods at the top level, so you rarely need to use `IOutputWriter` directly.
+
+```csharp
+public interface IOutputWriter {
+    void Write(string? text, object? color = null);
+    void Write(string? text, TextColor color = TextColor.ReplScriptOutputText);
+}
+
+// Extension methods add WriteLine variants
+public static void WriteLine(this IOutputWriter writer, string text, TextColor color = ...);
+```
+
+## Example: listing types in a loaded assembly
+
+```csharp
+// Resolve the document service to access loaded assemblies
+var docService = Resolve<dnSpy.Contracts.Documents.IDsDocumentService>();
+
+foreach (var doc in docService.GetDocuments()) {
+    PrintLine(doc.ToString());
+
+    if (doc.ModuleDef is dnlib.DotNet.ModuleDef module) {
+        foreach (var type in module.Types)
+            PrintLine($"  {type.FullName}");
+    }
+}
+```
+
+## Example: accessing the debugger from a script
+
+```csharp
+// Resolve the debugger service
+var debugger = TryResolve<dnSpy.Contracts.Debugger.DbgManager>();
+if (debugger is null) {
+    PrintLine("Debugger service not available.");
+} else {
+    foreach (var process in debugger.Processes)
+        PrintLine($"Process: {process.Id} — {process.Filename}");
+}
+```
+
+<Tip>
+  Use `TryResolve<T>()` when a service may not be present (for example, when no debugger session is active). `Resolve<T>()` throws if the service is missing.
+</Tip>
+
+## Running code on the UI thread
+
+Some dnSpy APIs must be called from the UI thread. Use the `UI(Action)` helper to marshal code to the dispatcher:
+
+```csharp
+UI(() => {
+    // Code here runs on the WPF UI thread
+    PrintLine("Running on UI thread.");
+});
+```
+
+## Background scripts and ICachedWriter
+
+If your script runs work on a background thread, use `CreateWriter()` to obtain an `ICachedWriter`. It buffers output and flushes it safely to the REPL panel.
+
+```csharp
+var writer = CreateWriter();
+Task.Run(() => {
+    writer.Write("Background work done.");
+    writer.Flush();
+});
+```
+
+## Script lifecycle
+
+<Steps>
+  <Step title="Write your script">
+    Type one or more C# statements at the REPL prompt. Multi-line input is supported.
+  </Step>
+  <Step title="Execute">
+    Press **Enter** on a blank line, or press the run button, to submit the script to Roslyn for compilation and execution.
+  </Step>
+  <Step title="Reset if needed">
+    Type `#reset` or click the reset button to tear down the current script state and start fresh. The `ScriptResetting` event fires before reset so you can clean up event subscriptions and avoid memory leaks.
+  </Step>
+</Steps>
+
+## Writing extensions vs. scripting
+
+Scripting is ideal for one-off automation and exploration. For reusable, packaged tooling you can use dnSpy's public MEF API to build a proper extension that ships with its own UI and commands.
+
+- [Extension overview](/extensions/overview)
+- [Getting started with extensions](/extensions/getting-started)
+- [Debugger API reference](/extensions/api/debugger-api)

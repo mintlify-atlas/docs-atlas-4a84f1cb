@@ -1,0 +1,223 @@
+---
+title: "IExtension interface and MEF composition"
+description: "Reference for IExtension, ExtensionInfo, ExtensionEvent, ExportExtensionAttribute, IAutoLoaded, and how MEF wires everything together."
+---
+
+Every dnSpy extension is anchored by a single class that implements `IExtension`. This class is the entry point dnSpy uses to identify your extension, retrieve its metadata, and deliver lifecycle events. The rest of your extension's functionality is composed by MEF through ordinary `[Export]` and `[Import]` attributes.
+
+## The `IExtension` interface
+
+`IExtension` is defined in `dnSpy.Contracts.Extension` and has three members:
+
+```csharp
+public interface IExtension {
+    void OnEvent(ExtensionEvent @event, object? obj);
+    ExtensionInfo ExtensionInfo { get; }
+    IEnumerable<string> MergedResourceDictionaries { get; }
+}
+```
+
+| Member | Purpose |
+|---|---|
+| `OnEvent` | Called by dnSpy when a lifecycle event fires. See [`ExtensionEvent`](#extensionevent-enum) below. |
+| `ExtensionInfo` | Returns metadata about the extension (description, copyright). |
+| `MergedResourceDictionaries` | Yields relative paths to XAML resource dictionaries that should be merged into the application's resources at startup. Return an empty enumerable if you have none. |
+
+### Exporting your implementation
+
+Decorate your `IExtension` class with `[ExportExtension]` so MEF discovers it. Each assembly may export exactly one `IExtension`.
+
+```csharp
+using System.Collections.Generic;
+using dnSpy.Contracts.Extension;
+
+[ExportExtension]
+sealed class TheExtension : IExtension {
+    public IEnumerable<string> MergedResourceDictionaries {
+        get {
+            // Yield any theme resource dictionaries your extension ships.
+            yield return "Themes/resourcedict.xaml";
+        }
+    }
+
+    public ExtensionInfo ExtensionInfo => new ExtensionInfo {
+        ShortDescription = "My extension",
+    };
+
+    public void OnEvent(ExtensionEvent @event, object? obj) {
+        // Handle lifecycle events here if needed.
+    }
+}
+```
+
+## `ExportExtensionAttribute`
+
+`ExportExtensionAttribute` is both an `ExportAttribute` (so MEF sees it) and a metadata attribute (so dnSpy can read the `Order` property without instantiating the type).
+
+```csharp
+[MetadataAttribute, AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
+public sealed class ExportExtensionAttribute : ExportAttribute, IExtensionMetadata {
+    public ExportExtensionAttribute()
+        : base(typeof(IExtension)) => Order = double.MaxValue;
+
+    // Controls initialization order relative to other extensions.
+    public double Order { get; set; }
+}
+```
+
+Set `Order` to a lower value if your extension must be initialized before others. The default is `double.MaxValue`, meaning last.
+
+## `ExtensionInfo`
+
+`ExtensionInfo` carries the descriptive metadata shown in dnSpy's extension list:
+
+```csharp
+public sealed class ExtensionInfo {
+    // Short human-readable description of the extension.
+    public string? ShortDescription { get; set; }
+
+    // Copyright string, or null to read it from AssemblyCopyrightAttribute.
+    public string? Copyright { get; set; }
+}
+```
+
+If you leave `Copyright` null, dnSpy reads the `AssemblyCopyrightAttribute` from your assembly automatically.
+
+## `ExtensionEvent` enum
+
+`OnEvent` is called with one of three `ExtensionEvent` values. The `obj` parameter carries additional data where applicable (currently always `null` for these events):
+
+| Value | When it fires |
+|---|---|
+| `Loaded` | All extensions have been loaded and MEF composition is complete. |
+| `AppLoaded` | The main application window has finished loading and is visible. |
+| `AppExit` | The application is closing. Use this to flush state or release resources. |
+
+```csharp
+public void OnEvent(ExtensionEvent @event, object? obj) {
+    switch (@event) {
+    case ExtensionEvent.Loaded:
+        // Safe to call into other exported services here.
+        break;
+    case ExtensionEvent.AppLoaded:
+        // The main window is visible. Safe to show UI.
+        break;
+    case ExtensionEvent.AppExit:
+        // Clean up.
+        break;
+    }
+}
+```
+
+<Note>
+Prefer `IAutoLoaded` over `OnEvent` for initialization code. `IAutoLoaded` classes receive their MEF imports via constructor injection, which is more predictable than calling services from `OnEvent`.
+</Note>
+
+## `IAutoLoaded` and `[ExportAutoLoaded]`
+
+Classes that implement `IAutoLoaded` and are exported with `[ExportAutoLoaded]` are instantiated automatically at startup — you do not need to reference them from anywhere else. This is the idiomatic way to run initialization code such as registering keyboard shortcuts or wiring up services.
+
+```csharp
+public interface IAutoLoaded { }
+```
+
+The interface has no members; it is a marker interface. All behavior comes from the constructor receiving MEF imports.
+
+### `ExportAutoLoadedAttribute`
+
+```csharp
+[ExportAutoLoaded]
+sealed class MyStartupCode : IAutoLoaded {
+    [ImportingConstructor]
+    MyStartupCode(IWpfCommandService wpfCommandService, IDsToolWindowService toolWindowService) {
+        // Register a keyboard shortcut on the main window.
+        var cmds = wpfCommandService.GetCommands(ControlConstants.GUID_MAINWINDOW);
+        cmds.Add(MyCommands.OpenToolWindow,
+            new RelayCommand(a => toolWindowService.Show(MyToolWindow.THE_GUID)));
+        cmds.Add(MyCommands.OpenToolWindow,
+            ModifierKeys.Control | ModifierKeys.Alt, Key.M);
+    }
+}
+```
+
+### `AutoLoadedLoadType`
+
+The `LoadType` property on `[ExportAutoLoaded]` controls when the class is instantiated relative to the rest of startup:
+
+| Value | When instantiated |
+|---|---|
+| `BeforeExtensions` | Before any `IExtension` instances are created. |
+| `AfterExtensions` | After all `IExtension` instances have been created. |
+| `AfterExtensionsLoaded` | After all extensions have been created and their `OnEvent(Loaded)` called. |
+| `AppLoaded` | After the main window is visible. **This is the default.** |
+
+```csharp
+[ExportAutoLoaded(LoadType = AutoLoadedLoadType.AfterExtensionsLoaded)]
+sealed class EarlyInit : IAutoLoaded {
+    [ImportingConstructor]
+    EarlyInit(ISomeService service) {
+        service.Initialize();
+    }
+}
+```
+
+## MEF composition patterns
+
+dnSpy uses [VS MEF](https://github.com/microsoft/vs-mef), which is fully compatible with the standard `System.ComponentModel.Composition` attribute API. Use the patterns below to integrate your extension with dnSpy's services.
+
+### Exporting a service
+
+```csharp
+[Export(typeof(IMyService))]
+sealed class MyServiceImpl : IMyService {
+    // implementation
+}
+```
+
+### Importing a service
+
+Use `[ImportingConstructor]` to receive dependencies. Avoid property injection; constructor injection is preferred in this codebase.
+
+```csharp
+[Export(typeof(IMyFeature))]
+sealed class MyFeature : IMyFeature {
+    readonly IMyService myService;
+
+    [ImportingConstructor]
+    MyFeature(IMyService myService) {
+        this.myService = myService;
+    }
+}
+```
+
+### Importing a collection of exports
+
+```csharp
+[ImportMany]
+IEnumerable<Lazy<IMyExtensionPoint, IMyMetadata>> extensionPoints = null!;
+```
+
+### Resource dictionaries
+
+If your extension ships WPF styles or templates, add them to `MergedResourceDictionaries` and place the XAML files next to the assembly:
+
+```csharp
+public IEnumerable<string> MergedResourceDictionaries {
+    get {
+        yield return "Themes/resourcedict.xaml";
+    }
+}
+```
+
+The paths are relative to the directory that contains your extension's DLL.
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Getting started" icon="rocket" href="/extensions/getting-started">
+    Step-by-step guide to creating and deploying your first extension.
+  </Card>
+  <Card title="Extension overview" icon="puzzle-piece" href="/extensions/overview">
+    High-level overview of what extensions can do and how loading works.
+  </Card>
+</CardGroup>

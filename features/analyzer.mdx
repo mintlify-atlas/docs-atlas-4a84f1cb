@@ -1,0 +1,93 @@
+---
+title: "Analyze type and member usage across .NET assemblies"
+description: "Find all callers, implementations, overrides, and instantiations of any .NET type or member across loaded assemblies with the Analyzer window."
+---
+
+The Analyzer lets you explore how any type or member is used across all loaded assemblies. Instead of manually searching for references, you open a tree view that categorises every usage — callers, overrides, interface implementations, and more — and lets you jump to each one.
+
+## Opening the Analyzer
+
+Right-click any type or member in the assembly tree or decompiler view, then select **Analyze**. The Analyzer window opens (or updates) and shows a tree rooted at the selected item.
+
+<Note>
+  You can analyze multiple items at the same time. Each analyzed item appears as a top-level node in the Analyzer window.
+</Note>
+
+## What the Analyzer shows
+
+The tree nodes that appear depend on the kind of member you are analyzing.
+
+<CardGroup cols={2}>
+  <Card title="Used By" icon="arrow-up">
+    Lists every method that calls this method or accesses this field or property. Equivalent to finding all callers.
+  </Card>
+  <Card title="Uses" icon="arrow-down">
+    Lists every method and member that this method calls or references internally.
+  </Card>
+  <Card title="Overridden By" icon="code-branch">
+    For virtual or abstract methods and properties: lists every type that provides an override.
+  </Card>
+  <Card title="Implemented By" icon="puzzle-piece">
+    For interface methods and properties: lists every type that provides a concrete implementation.
+  </Card>
+  <Card title="Instantiated By" icon="plus-circle">
+    For types: lists every method that creates an instance using `newobj` or a factory pattern.
+  </Card>
+  <Card title="Exposed By" icon="eye">
+    For types: lists members whose return type, parameter type, or field type is this type.
+  </Card>
+</CardGroup>
+
+### Node types per member kind
+
+<Tabs>
+  <Tab title="Method">
+    A method node can show **Used By** (callers), **Uses** (callees), **Overridden By**, and for interface methods, **Implemented By**.
+  </Tab>
+  <Tab title="Type">
+    A type node can show **Instantiated By**, **Used By**, **Exposed By**, and **Extension Methods** if any exist.
+  </Tab>
+  <Tab title="Field / Property / Event">
+    These nodes show **Used By** (code that reads or writes the member) and, for virtual members, override and implementation trees.
+  </Tab>
+</Tabs>
+
+## Navigating results
+
+<Steps>
+  <Step title="Select a member">
+    Right-click a type or member in the assembly tree or decompiler, then click **Analyze**.
+  </Step>
+  <Step title="Expand a category">
+    Click the arrow next to **Used By**, **Overridden By**, or any other category to load that set of results. Results are fetched asynchronously so the UI stays responsive.
+  </Step>
+  <Step title="Jump to a result">
+    Double-click any result node to navigate to that location in the decompiler.
+  </Step>
+  <Step title="Analyze a result">
+    Right-click a result node and select **Analyze** again to pivot the analysis to that member.
+  </Step>
+</Steps>
+
+## Real-world use cases
+
+**Finding where a class is instantiated**
+
+Open the Analyzer on a class and expand **Instantiated By**. Every `newobj` call site for that class appears as a result, including calls from other assemblies that are loaded.
+
+**Tracing a method's callers**
+
+Open the Analyzer on a method and expand **Used By**. The `MethodUsedByNode` searches the IL of every method body in every loaded assembly for call instructions that target your method, including `DllImport`-mapped P/Invoke calls.
+
+**Finding all interface implementations**
+
+Open the Analyzer on an interface method and expand **Implemented By** to see every concrete implementation across all loaded assemblies.
+
+<Tip>
+  The Analyzer searches across all currently loaded assemblies. Load additional assemblies into the document tree before running the analysis if you want complete cross-assembly coverage.
+</Tip>
+
+## Related pages
+
+- [Search](/features/search) — find members by name across all assemblies
+- [Debugger overview](/debugger/overview) — set breakpoints at the callers you find
